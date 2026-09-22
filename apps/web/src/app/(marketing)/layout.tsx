@@ -52,7 +52,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-2">
             <Link
               href="/contact"
-              className="hidden rounded-md bg-brand-maroon px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-maroon-dark sm:inline-flex"
+              className="inline-flex rounded-md bg-brand-maroon px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-maroon-dark sm:px-4 sm:text-sm"
             >
               Enroll Now
             </Link>
