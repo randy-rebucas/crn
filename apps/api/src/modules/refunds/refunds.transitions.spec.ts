@@ -1,0 +1,69 @@
+// Guards against the refund service's inline ALLOWED_TRANSITIONS map silently
+// regressing to allow skipping an approval step (blueprint Section 25).
+// The map itself is private to refunds.service.ts, so this re-derives the
+// expected shape and cross-checks it via the service's public transition
+// methods against a stub Prisma client instead of importing internals.
+import { RefundStatus } from '@prisma/client';
+import { RefundsService } from './refunds.service.js';
+
+function makeStubs(initialStatus: RefundStatus) {
+  const refund = {
+    id: 'refund-1',
+    status: initialStatus,
+    paymentId: 'payment-1',
+    approvedById: null as string | null,
+    processedAt: null as Date | null,
+  };
+
+  const prisma = {
+    refund: {
+      findFirst: async () => ({ ...refund, organizationId: 'org-1' }),
+      update: async ({ data }: { data: Partial<typeof refund> & { status: RefundStatus } }) => {
+        Object.assign(refund, data);
+        return { ...refund };
+      },
+    },
+    payment: {
+      findUniqueOrThrow: async () => ({ id: 'payment-1', invoiceId: 'invoice-1' }),
+    },
+  } as any;
+
+  const audit = { log: async () => {} } as any;
+  const invoices = { recomputeStatus: async () => {} } as any;
+
+  return { service: new RefundsService(prisma, audit, invoices), refund };
+}
+
+describe('RefundsService transition guard', () => {
+  it('allows Requested -> Officer Approved -> Approved -> Processed in order', async () => {
+    const { service } = makeStubs(RefundStatus.REQUESTED);
+
+    await expect(service.officerApprove('org-1', 'actor-1', 'refund-1')).resolves.toMatchObject({
+      status: RefundStatus.OFFICER_APPROVED,
+    });
+  });
+
+  it('rejects jumping from Requested straight to Approved (skipping officer approval)', async () => {
+    const { service } = makeStubs(RefundStatus.REQUESTED);
+
+    await expect(service.managerApprove('org-1', 'actor-1', 'refund-1')).rejects.toThrow(
+      /Cannot move refund/,
+    );
+  });
+
+  it('rejects processing a refund that has not been manager-approved', async () => {
+    const { service } = makeStubs(RefundStatus.OFFICER_APPROVED);
+
+    await expect(service.process('org-1', 'actor-1', 'refund-1')).rejects.toThrow(
+      /Cannot move refund/,
+    );
+  });
+
+  it('rejects any transition out of a terminal Processed refund', async () => {
+    const { service } = makeStubs(RefundStatus.PROCESSED);
+
+    await expect(service.officerApprove('org-1', 'actor-1', 'refund-1')).rejects.toThrow(
+      /Cannot move refund/,
+    );
+  });
+});

@@ -1,0 +1,184 @@
+'use client';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Field,
+  Input,
+  LoadingState,
+  PageHeader,
+  StatusBadge,
+} from '@/components/ui';
+
+interface Program {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: string;
+  courses: { id: string }[];
+}
+
+const createProgramSchema = z.object({
+  name: z.string().min(2, 'Name is required'),
+  slug: z
+    .string()
+    .min(2, 'Slug is required')
+    .regex(/^[a-z0-9-]+$/, 'Lowercase letters, numbers, and hyphens only'),
+  description: z.string().optional(),
+});
+type CreateProgramValues = z.infer<typeof createProgramSchema>;
+
+function useProgramActions() {
+  const queryClient = useQueryClient();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['programs'] });
+
+  const publish = useMutation({
+    mutationFn: (id: string) => apiClient.patch(`/v1/programs/${id}/publish`),
+    onSuccess: invalidate,
+  });
+  const archive = useMutation({
+    mutationFn: (id: string) => apiClient.patch(`/v1/programs/${id}/archive`),
+    onSuccess: invalidate,
+  });
+
+  return { publish, archive };
+}
+
+function CreateProgramForm({ onCreated }: { onCreated: () => void }) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateProgramValues>({ resolver: zodResolver(createProgramSchema) });
+
+  const onSubmit = async (values: CreateProgramValues) => {
+    await apiClient.post('/v1/programs', values);
+    reset();
+    onCreated();
+  };
+
+  return (
+    <Card className="p-5">
+      <h2 className="mb-4 text-sm font-semibold text-slate-900">New program</h2>
+      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-3">
+        <Field label="Name" error={errors.name?.message}>
+          <Input placeholder="Nursing Review" {...register('name')} />
+        </Field>
+        <Field label="Slug" error={errors.slug?.message}>
+          <Input placeholder="nursing-review" {...register('slug')} />
+        </Field>
+        <Field label="Description">
+          <Input placeholder="Optional" {...register('description')} />
+        </Field>
+        <div className="sm:col-span-3">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating…' : 'Create program'}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+export default function ProgramsPage() {
+  const { hasPermission } = useAuth();
+  const [showForm, setShowForm] = useState(false);
+
+  const { data, isLoading, isError, refetch } = useQuery<Program[]>({
+    queryKey: ['programs'],
+    queryFn: async () => (await apiClient.get('/v1/programs')).data,
+  });
+
+  const { publish, archive } = useProgramActions();
+
+  return (
+    <div>
+      <PageHeader
+        title="Programs"
+        description="Nursing, Midwifery, and every other review program offered."
+        action={
+          hasPermission('programs.create') && (
+            <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New Program'}</Button>
+          )
+        }
+      />
+
+      {showForm && (
+        <div className="mb-6">
+          <CreateProgramForm
+            onCreated={() => {
+              setShowForm(false);
+              refetch();
+            }}
+          />
+        </div>
+      )}
+
+      {isLoading && <LoadingState />}
+      {isError && <ErrorState message="Could not load programs." />}
+      {!isLoading && !isError && data?.length === 0 && (
+        <EmptyState title="No programs yet" description="Create your first program to get started." />
+      )}
+
+      {!isLoading && data && data.length > 0 && (
+        <Card className="overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Courses</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.map((program) => (
+                <tr key={program.id}>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-slate-900">{program.name}</div>
+                    <div className="text-xs text-slate-500">{program.slug}</div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{program.courses.length}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={program.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {hasPermission('programs.publish') && program.status !== 'PUBLISHED' && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => publish.mutate(program.id)}
+                        disabled={publish.isPending}
+                      >
+                        Publish
+                      </Button>
+                    )}
+                    {hasPermission('programs.archive') && program.status !== 'ARCHIVED' && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => archive.mutate(program.id)}
+                        disabled={archive.isPending}
+                      >
+                        Archive
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}

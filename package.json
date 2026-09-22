@@ -1,0 +1,14 @@
+{
+  "name": "obias",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace apps/web",
+    "dev:api": "npm run start:dev --workspace apps/api",
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down"
+  }
+}
