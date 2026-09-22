@@ -107,6 +107,10 @@ const STATUS_TONE: Record<string, keyof typeof BADGE_TONES> = {
   APPLICATION: 'blue',
   APPLICANT: 'gold',
   LOST: 'red',
+  GRADED: 'green',
+  PASSED: 'green',
+  FAILED: 'red',
+  IN_PROGRESS: 'blue',
 };
 
 export function StatusBadge({ status }: { status: string }) {

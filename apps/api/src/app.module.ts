@@ -33,6 +33,14 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { CertificatesModule } from './modules/certificates/certificates.module.js';
 import { LeadsModule } from './modules/leads/leads.module.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
+import { ProgressModule } from './modules/progress/progress.module.js';
+import { GradesModule } from './modules/grades/grades.module.js';
+import { SettingsModule } from './modules/settings/settings.module.js';
+import { AdmissionsModule } from './modules/admissions/admissions.module.js';
+import { StaffModule } from './modules/staff/staff.module.js';
+import { RequirementsModule } from './modules/requirements/requirements.module.js';
+import { PublicModule } from './modules/public/public.module.js';
+import { ContentModule } from './modules/content/content.module.js';
 
 @Module({
   imports: [
@@ -68,6 +76,14 @@ import { ReportsModule } from './modules/reports/reports.module.js';
     CertificatesModule,
     LeadsModule,
     ReportsModule,
+    ProgressModule,
+    GradesModule,
+    SettingsModule,
+    AdmissionsModule,
+    StaffModule,
+    RequirementsModule,
+    PublicModule,
+    ContentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

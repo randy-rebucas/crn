@@ -4,6 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { InvoicesService } from '../invoices/invoices.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { branchScopeWhere, paymentScopeWhere } from '../../common/authz/scope.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreatePaymentDto } from './dto/create-payment.dto.js';
 
 @Injectable()
@@ -18,11 +20,14 @@ export class PaymentsService {
   // `invoiceId` is now optional so finance staff can browse/search payments
   // org-wide (needed by the refund-request flow, which previously had no
   // way to find a payment except being handed its raw id) — `invoiceId`
-  // still narrows to one invoice's payments when provided.
-  findAllForInvoice(organizationId: string, invoiceId?: string) {
+  // still narrows to one invoice's payments when provided. Scoped by
+  // `payments.view` (blueprint Section 8: branch-specific financial
+  // visibility) — a Finance Officer only sees their own branch's payments.
+  findAllForInvoice(user: AuthenticatedUser, invoiceId?: string) {
     return this.prisma.payment.findMany({
       where: {
-        invoice: { organizationId },
+        invoice: { organizationId: user.organizationId },
+        ...paymentScopeWhere(user, 'payments.view'),
         ...(invoiceId ? { invoiceId } : {}),
       },
       include: {
@@ -41,9 +46,10 @@ export class PaymentsService {
     });
   }
 
-  async create(organizationId: string, actorId: string, dto: CreatePaymentDto) {
+  async create(user: AuthenticatedUser, actorId: string, dto: CreatePaymentDto) {
+    const organizationId = user.organizationId;
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id: dto.invoiceId, organizationId },
+      where: { id: dto.invoiceId, organizationId, ...branchScopeWhere(user, 'payments.create') },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.CANCELLED) {
@@ -71,9 +77,10 @@ export class PaymentsService {
     return payment;
   }
 
-  async verify(organizationId: string, actorId: string, id: string) {
+  async verify(user: AuthenticatedUser, actorId: string, id: string) {
+    const organizationId = user.organizationId;
     const payment = await this.prisma.payment.findFirst({
-      where: { id, invoice: { organizationId } },
+      where: { id, invoice: { organizationId }, ...paymentScopeWhere(user, 'payments.verify') },
       include: { invoice: true },
     });
     if (!payment) throw new NotFoundException('Payment not found');
@@ -81,24 +88,31 @@ export class PaymentsService {
       throw new BadRequestException(`Payment is already ${payment.status.toLowerCase()}`);
     }
 
-    const alreadyVerified = await this.prisma.payment.aggregate({
-      where: { invoiceId: payment.invoiceId, status: PaymentStatus.VERIFIED },
-      _sum: { amount: true },
-    });
-    const verifiedSoFar = alreadyVerified._sum.amount ?? 0;
-    if (verifiedSoFar + payment.amount > payment.invoice.totalAmount) {
-      throw new BadRequestException('Verifying this payment would exceed the invoice total');
-    }
+    // The over-verification check and the status update must be atomic —
+    // running the aggregate before a separate transaction let two
+    // concurrent verify calls both read the pre-update sum, both pass the
+    // check, and jointly push the invoice over its total. An interactive
+    // transaction re-reads the sum inside the same transaction that writes
+    // the update, closing that race.
+    const { verified, receipt } = await this.prisma.$transaction(async (tx) => {
+      const alreadyVerified = await tx.payment.aggregate({
+        where: { invoiceId: payment.invoiceId, status: PaymentStatus.VERIFIED },
+        _sum: { amount: true },
+      });
+      const verifiedSoFar = alreadyVerified._sum.amount ?? 0;
+      if (verifiedSoFar + payment.amount > payment.invoice.totalAmount) {
+        throw new BadRequestException('Verifying this payment would exceed the invoice total');
+      }
 
-    const [verified, receipt] = await this.prisma.$transaction([
-      this.prisma.payment.update({
+      const verified = await tx.payment.update({
         where: { id },
         data: { status: PaymentStatus.VERIFIED, verifiedById: actorId, verifiedAt: new Date() },
-      }),
-      this.prisma.receipt.create({
+      });
+      const receipt = await tx.receipt.create({
         data: { paymentId: id, receiptNumber: `RCPT-${id.slice(0, 8).toUpperCase()}` },
-      }),
-    ]);
+      });
+      return { verified, receipt };
+    });
 
     await this.invoices.recomputeStatus(payment.invoiceId);
 
@@ -128,8 +142,11 @@ export class PaymentsService {
     return { ...verified, receipt };
   }
 
-  async reject(organizationId: string, actorId: string, id: string) {
-    const payment = await this.prisma.payment.findFirst({ where: { id, invoice: { organizationId } } });
+  async reject(user: AuthenticatedUser, actorId: string, id: string) {
+    const organizationId = user.organizationId;
+    const payment = await this.prisma.payment.findFirst({
+      where: { id, invoice: { organizationId }, ...paymentScopeWhere(user, 'payments.verify') },
+    });
     if (!payment) throw new NotFoundException('Payment not found');
     if (payment.status !== PaymentStatus.PENDING) {
       throw new BadRequestException(`Payment is already ${payment.status.toLowerCase()}`);

@@ -3,6 +3,7 @@ import { PaymentStatus, RefundStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { InvoicesService } from '../invoices/invoices.service.js';
+import { paymentScopeWhere, refundScopeWhere } from '../../common/authz/scope.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateRefundDto } from './dto/create-refund.dto.js';
 
@@ -24,22 +25,33 @@ export class RefundsService {
     private readonly invoices: InvoicesService,
   ) {}
 
-  findAllForOrganization(organizationId: string) {
+  // Scoped by `refunds.view` (blueprint Section 8: branch-specific
+  // financial visibility) — a Finance Officer only sees their own branch's
+  // refunds, never the whole organization's.
+  findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.refund.findMany({
-      where: { organizationId },
+      where: { organizationId: user.organizationId, ...refundScopeWhere(user, 'refunds.view') },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(organizationId: string, id: string) {
-    const refund = await this.prisma.refund.findFirst({ where: { id, organizationId } });
+  async findOne(user: AuthenticatedUser, id: string) {
+    const refund = await this.prisma.refund.findFirst({
+      where: { id, organizationId: user.organizationId, ...refundScopeWhere(user, 'refunds.view') },
+    });
     if (!refund) throw new NotFoundException('Refund not found');
     return refund;
   }
 
-  async create(organizationId: string, actorId: string, dto: CreateRefundDto) {
+  async create(user: AuthenticatedUser, actorId: string, dto: CreateRefundDto) {
+    const organizationId = user.organizationId;
     const payment = await this.prisma.payment.findFirst({
-      where: { id: dto.paymentId, invoice: { organizationId }, status: PaymentStatus.VERIFIED },
+      where: {
+        id: dto.paymentId,
+        invoice: { organizationId },
+        status: PaymentStatus.VERIFIED,
+        ...paymentScopeWhere(user, 'refunds.create'),
+      },
     });
     if (!payment) throw new NotFoundException('Verified payment not found');
     if (dto.amount > payment.amount) {
@@ -68,13 +80,23 @@ export class RefundsService {
     return refund;
   }
 
+  // Scope-checks the lookup against `scopePermissionKey` (the permission
+  // actually gating this transition) rather than reusing `refunds.view`'s
+  // scope — a custom role could hold `refunds.view` at ORGANIZATION but
+  // `refunds.officer_approve` at BRANCH, and the narrower one must govern
+  // which refunds this specific action can reach.
   private async transition(
-    organizationId: string,
-    actorId: string,
+    user: AuthenticatedUser,
     id: string,
     nextStatus: RefundStatus,
+    scopePermissionKey: string,
   ) {
-    const refund = await this.findOne(organizationId, id);
+    const organizationId = user.organizationId;
+    const actorId = user.id;
+    const refund = await this.prisma.refund.findFirst({
+      where: { id, organizationId, ...refundScopeWhere(user, scopePermissionKey) },
+    });
+    if (!refund) throw new NotFoundException('Refund not found');
 
     const allowed = ALLOWED_TRANSITIONS[refund.status];
     if (!allowed.includes(nextStatus)) {
@@ -108,26 +130,29 @@ export class RefundsService {
     return updated;
   }
 
-  officerApprove(organizationId: string, actorId: string, id: string) {
-    return this.transition(organizationId, actorId, id, RefundStatus.OFFICER_APPROVED);
+  officerApprove(user: AuthenticatedUser, id: string) {
+    return this.transition(user, id, RefundStatus.OFFICER_APPROVED, 'refunds.officer_approve');
   }
 
-  managerApprove(organizationId: string, actorId: string, id: string) {
-    return this.transition(organizationId, actorId, id, RefundStatus.APPROVED);
+  managerApprove(user: AuthenticatedUser, id: string) {
+    return this.transition(user, id, RefundStatus.APPROVED, 'refunds.manager_approve');
   }
 
   async reject(user: AuthenticatedUser, id: string) {
-    const refund = await this.findOne(user.organizationId, id);
+    const refund = await this.prisma.refund.findFirst({
+      where: { id, organizationId: user.organizationId, ...refundScopeWhere(user, 'refunds.view') },
+    });
+    if (!refund) throw new NotFoundException('Refund not found');
     const requiredPermission =
       refund.status === RefundStatus.REQUESTED ? 'refunds.officer_approve' : 'refunds.manager_approve';
     const held = user.permissions.some((p) => p.key === requiredPermission);
     if (!held) {
       throw new ForbiddenException(`Rejecting a refund at this stage requires ${requiredPermission}`);
     }
-    return this.transition(user.organizationId, user.id, id, RefundStatus.REJECTED);
+    return this.transition(user, id, RefundStatus.REJECTED, requiredPermission);
   }
 
-  process(organizationId: string, actorId: string, id: string) {
-    return this.transition(organizationId, actorId, id, RefundStatus.PROCESSED);
+  process(user: AuthenticatedUser, id: string) {
+    return this.transition(user, id, RefundStatus.PROCESSED, 'refunds.process');
   }
 }

@@ -155,4 +155,72 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
   }
+
+  // Always resolves the same way regardless of whether the email exists —
+  // an anonymous caller must never be able to tell known accounts from
+  // unknown ones via this endpoint (user enumeration).
+  //
+  // No email transport is wired up in this codebase yet, so the reset link
+  // is logged to the server console instead of sent — this is a real,
+  // working token flow, just missing the delivery channel. Wire an actual
+  // mail provider into the `// TODO` below before relying on this in
+  // production.
+  async requestPasswordReset(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || user.status !== 'ACTIVE') return;
+
+    const token = randomBytes(32).toString('hex');
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: this.hashToken(token),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const webOrigin = this.config.get<string>('WEB_ORIGIN', 'http://localhost:3000');
+    // TODO: send via a real mail provider instead of logging.
+    // eslint-disable-next-line no-console
+    console.log(`[password-reset] ${email}: ${webOrigin}/reset-password?token=${token}`);
+
+    await this.audit.log({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: 'auth.password_reset.requested',
+      resource: 'user',
+      resourceId: user.id,
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const tokenHash = this.hashToken(token);
+    const stored = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!stored || stored.usedAt || stored.expiresAt < new Date() || stored.user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Invalid or expired reset link');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: stored.userId }, data: { passwordHash } }),
+      this.prisma.passwordResetToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } }),
+      // A password reset invalidates every existing session, not just this flow's own token.
+      this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.log({
+      organizationId: stored.user.organizationId,
+      actorId: stored.userId,
+      action: 'auth.password_reset.completed',
+      resource: 'user',
+      resourceId: stored.userId,
+    });
+  }
 }

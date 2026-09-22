@@ -15,13 +15,13 @@ export class InvoicesController {
   @Get()
   @RequirePermissions('invoices.view')
   findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.invoices.findAllForOrganization(user.organizationId);
+    return this.invoices.findAllForOrganization(user);
   }
 
   @Get(':id')
   @RequirePermissions('invoices.view')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.invoices.findOne(user.organizationId, id);
+    return this.invoices.findOne(user, id);
   }
 
   @Post()

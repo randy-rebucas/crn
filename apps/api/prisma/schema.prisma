@@ -23,6 +23,10 @@ model Organization {
   roles    Role[]
   programs Program[]
   leads    Lead[]
+  settings OrganizationSettings?
+  announcements Announcement[]
+  successStories SuccessStory[]
+  faqItems FaqItem[]
 
   @@map("organizations")
 }
@@ -42,10 +46,12 @@ model Branch {
   batches            Batch[]
   studentProfiles    StudentProfile[]
   instructorProfiles InstructorProfile[]
+  staffProfiles      StaffProfile[]
   enrollments        Enrollment[]
   rooms              Room[]
   classes            Class[]
   leads              Lead[]
+  admissions         Admission[]
 
   @@unique([organizationId, code])
   @@map("branches")
@@ -70,17 +76,22 @@ model User {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  organization      Organization       @relation(fields: [organizationId], references: [id])
-  branches          UserBranch[]
-  roles             UserRole[]
-  refreshTokens     RefreshToken[]
-  auditLogs         AuditLog[]
-  studentProfile    StudentProfile?
-  instructorProfile InstructorProfile?
-  authoredQuestions Question[]         @relation("QuestionAuthor")
-  reviewedQuestions Question[]         @relation("QuestionReviewer")
-  assignedLeads     Lead[]
-  notifications     Notification[]
+  organization                   Organization            @relation(fields: [organizationId], references: [id])
+  branches                       UserBranch[]
+  roles                          UserRole[]
+  refreshTokens                  RefreshToken[]
+  passwordResetTokens            PasswordResetToken[]
+  auditLogs                      AuditLog[]
+  studentProfile                 StudentProfile?
+  instructorProfile              InstructorProfile?
+  staffProfile                   StaffProfile?
+  authoredQuestions              Question[]              @relation("QuestionAuthor")
+  reviewedQuestions              Question[]              @relation("QuestionReviewer")
+  assignedLeads                  Lead[]
+  notifications                  Notification[]
+  reviewedAdmissions             Admission[]             @relation("AdmissionReviewer")
+  reviewedRequirementSubmissions RequirementSubmission[] @relation("RequirementSubmissionReviewer")
+  authoredAnnouncements          Announcement[]
 
   @@index([organizationId])
   @@map("users")
@@ -117,6 +128,20 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +246,8 @@ model Program {
   exams        Exam[]
   pricing      Pricing[]
   certificates Certificate[]
+  admissions   Admission[]
+  requirements Requirement[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -443,16 +470,77 @@ model Enrollment {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  student  StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  program  Program        @relation(fields: [programId], references: [id])
-  batch    Batch?         @relation(fields: [batchId], references: [id])
-  branch   Branch         @relation(fields: [branchId], references: [id])
-  invoices Invoice[]
+  student                StudentProfile          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  program                Program                 @relation(fields: [programId], references: [id])
+  batch                  Batch?                  @relation(fields: [batchId], references: [id])
+  branch                 Branch                  @relation(fields: [branchId], references: [id])
+  invoices               Invoice[]
+  requirementSubmissions RequirementSubmission[]
 
   @@index([studentId])
   @@index([programId])
   @@index([branchId])
   @@map("enrollments")
+}
+
+// ---------------------------------------------------------------------------
+// Enrollment requirements (blueprint Section 11: the "Requirements" step
+// between Student Information and Payment, and the backing data behind the
+// REQUIREMENTS_INCOMPLETE enrollment status). A Requirement is an
+// org-defined checklist item (optionally scoped to one program); a
+// RequirementSubmission is one enrollment's attempt at satisfying it,
+// carrying the uploaded file plus a review decision.
+// ---------------------------------------------------------------------------
+
+model Requirement {
+  id             String   @id @default(uuid())
+  organizationId String
+  programId      String? // null = applies to every program
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  program     Program?                @relation(fields: [programId], references: [id])
+  submissions RequirementSubmission[]
+
+  @@index([organizationId])
+  @@index([programId])
+  @@map("requirements")
+}
+
+enum RequirementSubmissionStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model RequirementSubmission {
+  id            String                      @id @default(uuid())
+  enrollmentId  String
+  requirementId String
+  status        RequirementSubmissionStatus @default(PENDING)
+  fileName      String?
+  filePath      String?
+  fileMimeType  String?
+  fileSizeBytes Int?
+  submittedAt   DateTime?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewNotes   String?
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
+
+  enrollment  Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  reviewedBy  User?       @relation("RequirementSubmissionReviewer", fields: [reviewedById], references: [id])
+
+  @@unique([enrollmentId, requirementId])
+  @@index([enrollmentId])
+  @@index([requirementId])
+  @@map("requirement_submissions")
 }
 
 // ---------------------------------------------------------------------------
@@ -847,6 +935,7 @@ model Lead {
   phone           String?
   programInterest String?
   source          String?
+  message         String?
   status          LeadStatus @default(LEAD)
   assignedToId    String?
   createdAt       DateTime   @default(now())
@@ -856,6 +945,7 @@ model Lead {
   branch       Branch?        @relation(fields: [branchId], references: [id])
   assignedTo   User?          @relation(fields: [assignedToId], references: [id])
   followUps    LeadFollowUp[]
+  admission    Admission?
 
   @@index([organizationId])
   @@index([status])
@@ -927,4 +1017,160 @@ model AuditLog {
   @@index([resource, resourceId])
   @@index([actorId])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Organization settings
+// ---------------------------------------------------------------------------
+
+// One row per Organization — a place for org-wide, low-churn configuration
+// that previously had nowhere to live (support contact, default timezone,
+// enrollment/notification toggles). Deliberately not per-branch: branches
+// already have their own row for anything that varies by location.
+model OrganizationSettings {
+  id                      String   @id @default(uuid())
+  organizationId          String   @unique
+  supportEmail            String?
+  supportPhone            String?
+  timezone                String   @default("Asia/Manila")
+  allowSelfEnrollment     Boolean  @default(false)
+  notifyOnEnrollment      Boolean  @default(true)
+  notifyOnPaymentVerified Boolean  @default(true)
+  updatedById             String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Staff (non-teaching personnel — distinct from InstructorProfile, which is
+// specifically the teaching role classes/schedules attach to)
+// ---------------------------------------------------------------------------
+
+enum StaffStatus {
+  ACTIVE
+  ON_LEAVE
+  ARCHIVED
+}
+
+model StaffProfile {
+  id             String      @id @default(uuid())
+  userId         String      @unique
+  organizationId String
+  branchId       String?
+  position       String
+  department     String?
+  hireDate       DateTime?
+  status         StaffStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([organizationId])
+  @@map("staff_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Admissions — the review/decision step that turns a Lead's APPLICATION
+// into an APPROVED admission a registrar can enroll. Leads already carry
+// APPLICATION/APPLICANT stages in LeadStatus; this is the decision record
+// that stage was missing, not a replacement for the CRM pipeline.
+// ---------------------------------------------------------------------------
+
+enum AdmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model Admission {
+  id             String          @id @default(uuid())
+  organizationId String
+  branchId       String?
+  leadId         String          @unique
+  programId      String?
+  status         AdmissionStatus @default(SUBMITTED)
+  notes          String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  program    Program? @relation(fields: [programId], references: [id])
+  reviewedBy User?    @relation("AdmissionReviewer", fields: [reviewedById], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("admissions")
+}
+
+// ---------------------------------------------------------------------------
+// Public marketing content — Announcements, Success Stories, FAQ (blueprint
+// Sections 19 & 21). Same Draft->Review->Approved->Published->Archived
+// pipeline as curriculum content (ContentStatus, reused rather than a
+// parallel enum): only PUBLISHED rows are ever visible through the public
+// API, exactly like Program/Course/Subject/Module/Lesson/Material.
+// ---------------------------------------------------------------------------
+
+model Announcement {
+  id          String        @id @default(uuid())
+  organizationId String
+  title       String
+  body        String
+  publishedAt DateTime?
+  status      ContentStatus @default(DRAFT)
+  authorId    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  author       User?        @relation(fields: [authorId], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("announcements")
+}
+
+model SuccessStory {
+  id             String        @id @default(uuid())
+  organizationId String
+  graduateName   String
+  programName    String
+  year           Int?
+  testimonial    String
+  photoUrl       String?
+  status         ContentStatus @default(DRAFT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("success_stories")
+}
+
+model FaqItem {
+  id             String        @id @default(uuid())
+  organizationId String
+  question       String
+  answer         String
+  position       Int           @default(0)
+  status         ContentStatus @default(DRAFT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("faq_items")
 }

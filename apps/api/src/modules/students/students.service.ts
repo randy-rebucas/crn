@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { studentScopeWhere } from '../../common/authz/scope.js';
+import { getScope, studentScopeWhere } from '../../common/authz/scope.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
 
@@ -34,12 +34,37 @@ export class StudentsService {
     private readonly audit: AuditService,
   ) {}
 
+  // ASSIGNED scope (blueprint Section 7's own example: an instructor sees
+  // students.view only for their assigned classes) needs a DB lookup — the
+  // caller's InstructorProfile id, then the students enrolled in batches
+  // that have a class taught by that instructor — so it can't be resolved
+  // by the sync `studentScopeWhere` helper the way BRANCH/SELF can.
+  private async assignedStudentWhere(user: AuthenticatedUser) {
+    const instructor = await this.prisma.instructorProfile.findFirst({
+      where: { userId: user.id, organizationId: user.organizationId },
+    });
+    // No instructor profile = assigned to nothing; match no student rather
+    // than accidentally falling through to "see everything".
+    const instructorProfileId = instructor?.id ?? '__no_instructor_profile__';
+    return {
+      enrollments: { some: { batch: { classes: { some: { instructorProfileId } } } } },
+    };
+  }
+
+  private async resolveScopeWhere(user: AuthenticatedUser, permissionKey: string) {
+    if (getScope(user, permissionKey) === 'ASSIGNED') {
+      return this.assignedStudentWhere(user);
+    }
+    return studentScopeWhere(user, permissionKey);
+  }
+
   // Scoped by the caller's resolved `students.view` grant (blueprint
   // Section 7): a Branch Manager only sees their branch's students, a
-  // student account (SELF scope) only ever sees its own profile.
-  findAllForOrganization(user: AuthenticatedUser) {
+  // student account (SELF scope) only ever sees its own profile, an
+  // Instructor (ASSIGNED scope) only sees students in their own classes.
+  async findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.studentProfile.findMany({
-      where: { organizationId: user.organizationId, ...studentScopeWhere(user, 'students.view') },
+      where: { organizationId: user.organizationId, ...(await this.resolveScopeWhere(user, 'students.view')) },
       select: PROFILE_SELECT,
       orderBy: { createdAt: 'desc' },
     });
@@ -47,7 +72,7 @@ export class StudentsService {
 
   async findOne(user: AuthenticatedUser, id: string) {
     const student = await this.prisma.studentProfile.findFirst({
-      where: { id, organizationId: user.organizationId, ...studentScopeWhere(user, 'students.view') },
+      where: { id, organizationId: user.organizationId, ...(await this.resolveScopeWhere(user, 'students.view')) },
       select: { ...PROFILE_SELECT, enrollments: true },
     });
     if (!student) throw new NotFoundException('Student not found');
@@ -56,6 +81,18 @@ export class StudentsService {
 
   async create(organizationId: string, actorId: string, dto: CreateStudentDto) {
     const passwordHash = await argon2.hash(dto.password);
+
+    // The `student` system role is always attached, regardless of `roleIds`:
+    // this endpoint both creates the User and its StudentProfile in one call,
+    // so unlike instructor/staff creation (which attach a profile to a user
+    // already provisioned with roles via /v1/users) there's no other step
+    // where roles get assigned. Without this, an omitted `roleIds` silently
+    // produces an ACTIVE account with zero permissions — unable to view even
+    // its own profile.
+    const studentRole = await this.prisma.role.findUniqueOrThrow({
+      where: { organizationId_key: { organizationId, key: 'student' } },
+    });
+    const roleIds = new Set([studentRole.id, ...(dto.roleIds ?? [])]);
 
     const student = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -67,7 +104,7 @@ export class StudentsService {
           lastName: dto.lastName,
           phone: dto.phone,
           branches: dto.branchId ? { create: [{ branchId: dto.branchId }] } : undefined,
-          roles: dto.roleIds ? { create: dto.roleIds.map((roleId) => ({ roleId })) } : undefined,
+          roles: { create: Array.from(roleIds).map((roleId) => ({ roleId })) },
         },
       });
 

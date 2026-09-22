@@ -1,0 +1,684 @@
+<title>Results Wall</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root{
+    --maroon:#7c1220;
+    --maroon-ink:#4a0a13;
+    --maroon-deep:#33060d;
+    --gold:#d7a13d;
+    --gold-soft:#f0d9a4;
+    --cream:#f6efe0;
+    --cream-2:#eee3cb;
+    --navy:#0f1e33;
+    --navy-2:#16294380;
+    --ink:#241611;
+    --paper:#fbf7ec;
+    --line: rgba(36,22,17,0.16);
+    --success:#3f6b3f;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--paper);
+    color: var(--ink);
+    font-family:'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  img{max-width:100%;display:block;}
+
+  .wrap{max-width:1180px;margin:0 auto;padding-inline:24px;}
+
+  h1,h2,h3{font-family:'Fraunces', Georgia, serif; margin:0; text-wrap:balance;}
+
+  .eyebrow{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color: var(--gold);
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:'';width:22px;height:1px;background:var(--gold);}
+
+  a{color:inherit;}
+
+  /* ---------- annotation / intro note ---------- */
+  .concept-note{
+    background: var(--navy);
+    color: #cfd8e6;
+    font-family:'Space Mono', monospace;
+    font-size:12.5px;
+    line-height:1.6;
+    padding: 14px 24px;
+    text-align:center;
+  }
+  .concept-note b{color:#fff;}
+
+  /* ================= NAV ================= */
+  nav.site{
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top:0; z-index: 50;
+  }
+  .nav-inner{
+    max-width:1180px;margin:0 auto;padding:16px 24px;
+    display:flex; align-items:center; justify-content:space-between; gap:24px;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:44px;height:44px;border-radius:50%;
+    background: conic-gradient(from 220deg, var(--maroon), var(--maroon-ink), var(--gold), var(--maroon));
+    display:flex;align-items:center;justify-content:center;
+    color:#fff; font-family:'Fraunces'; font-weight:800; font-size:15px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.4);
+  }
+  .brand-word{font-family:'Fraunces'; font-weight:700; font-size:17px; line-height:1.15;}
+  .brand-sub{font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:#6b5b4d;}
+  .nav-links{display:flex; gap:28px; font-size:14.5px; font-weight:500;}
+  .nav-links a{text-decoration:none; color:var(--ink); position:relative; padding-block:4px;}
+  .nav-links a:hover{color:var(--maroon);}
+  .btn{
+    font-family:'DM Sans'; font-weight:700; font-size:14.5px;
+    padding:11px 22px; border-radius:3px; text-decoration:none;
+    display:inline-flex; align-items:center; gap:8px; border:1.5px solid transparent;
+    cursor:pointer; white-space:nowrap;
+  }
+  .btn-primary{background:var(--maroon); color:#fff;}
+  .btn-primary:hover{background:var(--maroon-ink);}
+  .btn-ghost{border-color:var(--ink); color:var(--ink); background:transparent;}
+  .btn-ghost:hover{background:var(--ink); color:var(--paper);}
+  .btn-gold{background:var(--gold); color:var(--maroon-deep);}
+  .btn-gold:hover{background:#c8933a;}
+  .nav-cta{display:flex; align-items:center; gap:14px;}
+  .nav-toggle{display:none;}
+
+  /* ================= HERO — diagonal banner / results-day cut ================= */
+  .hero{
+    position:relative;
+    background: var(--maroon);
+    color:#fff;
+    overflow:hidden;
+    padding-top:64px;
+  }
+  .hero::before{ /* diagonal gold seam */
+    content:'';
+    position:absolute; inset:0;
+    background:
+      linear-gradient(115deg, var(--maroon) 0 54%, var(--gold) 54% 54.6%, var(--maroon-ink) 54.6% 100%);
+    z-index:0;
+  }
+  .hero-grid{
+    position:relative; z-index:1;
+    max-width:1180px;margin:0 auto;padding:0 24px;
+    display:grid; grid-template-columns:1.05fr .95fr; gap:40px;
+    align-items:center;
+    min-height:560px;
+  }
+  .hero-copy .eyebrow{color:var(--gold-soft);}
+  .hero-copy .eyebrow::before{background:var(--gold-soft);}
+  .hero-copy h1{
+    font-size:clamp(38px,4.6vw,60px);
+    line-height:1.03;
+    font-weight:700;
+    margin-top:16px;
+    color:#fff;
+  }
+  .hero-copy h1 em{
+    font-style:italic; font-weight:500; color:var(--gold-soft);
+    display:block; font-size:.5em; margin-top:6px; letter-spacing:.01em;
+  }
+  .hero-copy p.lede{
+    font-size:17px; line-height:1.65; color:#f1e2d8; max-width:46ch; margin-top:20px;
+  }
+  .hero-actions{display:flex; gap:14px; margin-top:32px; flex-wrap:wrap;}
+  .hero-chips{display:flex; gap:22px; margin-top:38px; flex-wrap:wrap;}
+  .hero-chip{display:flex; align-items:center; gap:9px; font-size:13.5px; color:#f1e2d8;}
+  .hero-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);}
+
+  /* results-card stack (photo replacement using color blocks + certificate framing, real copy) */
+  .hero-visual{position:relative; height:500px;}
+  .result-card{
+    position:absolute;
+    background: var(--paper);
+    border-radius:4px;
+    box-shadow: 0 24px 48px rgba(0,0,0,.35);
+    padding:20px 22px;
+    color:var(--ink);
+  }
+  .rc-main{
+    width:280px; right:0; top:20px;
+    border: 2px solid var(--gold);
+  }
+  .rc-main .rc-tag{font-family:'Space Mono'; font-size:10.5px; letter-spacing:.1em; color:var(--maroon); text-transform:uppercase;}
+  .rc-main h3{font-size:22px; margin-top:8px; line-height:1.2;}
+  .rc-main .rc-name{margin-top:14px; font-weight:700; font-size:15px;}
+  .rc-main .rc-role{font-size:12.5px; color:#6b5b4d;}
+  .rc-badge{
+    position:absolute; bottom:-16px; right:-16px;
+    width:78px;height:78px;border-radius:50%;
+    background:var(--gold); color:var(--maroon-deep);
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    font-family:'Space Mono'; font-size:10px; font-weight:700; line-height:1.2;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    border:3px solid var(--paper);
+  }
+  .rc-stat{
+    width:190px; left:0; bottom:36px;
+    background: var(--navy); color:#fff;
+  }
+  .rc-stat .rc-num{font-family:'Fraunces'; font-size:34px; font-weight:700; color:var(--gold-soft);}
+  .rc-stat .rc-label{font-size:12px; color:#c9d3e0; margin-top:4px;}
+
+  .hero-banner{
+    position:relative; z-index:1;
+    background: var(--navy);
+    border-top:1px solid rgba(255,255,255,.08);
+  }
+  .banner-inner{
+    max-width:1180px;margin:0 auto;padding:14px 24px;
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    font-family:'Space Mono'; font-size:13px; color:#e7ecf3;
+  }
+  .banner-inner .tag{
+    background:var(--gold); color:var(--maroon-deep); font-weight:700;
+    padding:3px 10px; border-radius:2px; letter-spacing:.04em; font-size:11.5px;
+  }
+  .banner-inner .sep{color:#5c6b83;}
+
+  /* ================= PROGRAMS — roster / ticket grid ================= */
+  .section{padding-block:88px;}
+  .section-head{max-width:640px; margin-bottom:48px;}
+  .section-head h2{font-size:clamp(28px,3.4vw,40px); margin-top:14px; font-weight:700;}
+  .section-head p{font-size:16px; color:#5a4a3c; margin-top:14px; line-height:1.6;}
+  .section-head.center{max-width:620px; margin-inline:auto; text-align:center;}
+  .section-head.center .eyebrow{justify-content:center;}
+  .section-head.center .eyebrow::before{display:none;}
+
+  .programs{background:var(--cream);}
+  .roster{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+    border-top:2px solid var(--ink); border-left:1px solid var(--line);
+  }
+  .roster-card{
+    border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+    padding:28px 22px; background:var(--paper);
+    position:relative; transition:background .2s ease;
+  }
+  .roster-card:hover{background:#fff;}
+  .roster-index{
+    font-family:'Space Mono'; font-size:12px; color:var(--maroon);
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .roster-index .code{letter-spacing:.05em;}
+  .roster-index .status{
+    font-size:9.5px; text-transform:uppercase; letter-spacing:.08em;
+    background: var(--success); color:#fff; padding:2px 7px; border-radius:2px;
+  }
+  .roster-card h3{font-size:19px; margin-top:16px; line-height:1.2;}
+  .roster-card p{font-size:13.5px; color:#6b5b4d; margin-top:8px; line-height:1.5; min-height:38px;}
+  .roster-link{
+    margin-top:18px; display:inline-flex; align-items:center; gap:6px;
+    font-size:13px; font-weight:700; color:var(--maroon); text-decoration:none;
+  }
+  .roster-link:hover{text-decoration:underline;}
+
+  .also-row{
+    margin-top:0;
+    display:flex; align-items:center; gap:28px; flex-wrap:wrap; justify-content:space-between;
+    background: var(--maroon-ink); color:#fff; padding:26px 32px; border-radius:4px; margin-top:28px;
+  }
+  .also-list{display:flex; gap:28px; flex-wrap:wrap; font-size:14.5px;}
+  .also-list span{display:flex; align-items:center; gap:8px;}
+  .also-list .chk{color:var(--gold);}
+  .also-label{font-family:'Space Mono'; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#e0c98f;}
+
+  /* ================= PROOF / RESULTS — certificate band ================= */
+  .proof{
+    background: var(--navy);
+    color:#fff;
+    position:relative;
+  }
+  .proof-frame{
+    border:1px solid rgba(215,161,61,.4);
+    margin: 0 auto; max-width:1180px;
+    padding: 64px 48px;
+    position:relative;
+  }
+  .proof-frame::before, .proof-frame::after,
+  .corner-tl, .corner-tr, .corner-bl, .corner-br{content:'';position:absolute; width:22px;height:22px; border-color:var(--gold); border-style:solid;}
+  .corner-tl{top:-1px;left:-1px;border-width:2px 0 0 2px;}
+  .corner-tr{top:-1px;right:-1px;border-width:2px 2px 0 0;}
+  .corner-bl{bottom:-1px;left:-1px;border-width:0 0 2px 2px;}
+  .corner-br{bottom:-1px;right:-1px;border-width:0 2px 2px 0;}
+  .proof-head{text-align:center; max-width:640px; margin:0 auto 56px;}
+  .proof-head .eyebrow{justify-content:center; color:var(--gold-soft);}
+  .proof-head .eyebrow::before{display:none;}
+  .proof-head h2{color:#fff; font-size:clamp(26px,3.2vw,36px); margin-top:14px;}
+
+  .stat-row{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+  }
+  .stat{
+    text-align:center; padding: 0 16px; border-right:1px solid rgba(255,255,255,.14);
+  }
+  .stat:last-child{border-right:none;}
+  .stat .num{font-family:'Fraunces'; font-weight:700; font-size:clamp(34px,3.4vw,46px); color:var(--gold-soft);}
+  .stat .lbl{font-size:13px; color:#c9d3e0; margin-top:8px; line-height:1.4;}
+
+  .testimonial-strip{
+    margin-top:64px;
+    display:grid; grid-template-columns:repeat(3,1fr); gap:20px;
+  }
+  .pin-card{
+    background:#101f34; border:1px solid rgba(255,255,255,.12);
+    padding:24px 22px 22px; border-radius:3px; position:relative;
+  }
+  .pin-card::before{
+    content:'';position:absolute; top:-8px; left:24px; width:16px;height:16px;border-radius:50%;
+    background:var(--gold); box-shadow:0 3px 6px rgba(0,0,0,.4);
+  }
+  .pin-quote{font-family:'Fraunces'; font-style:italic; font-size:16px; line-height:1.55; color:#eef1f6;}
+  .pin-who{margin-top:16px; display:flex; align-items:center; gap:10px;}
+  .pin-avatar{
+    width:34px;height:34px;border-radius:50%;
+    background: linear-gradient(135deg, var(--gold), var(--maroon));
+    font-family:'Space Mono'; font-size:12px; color:#fff; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pin-name{font-size:13.5px; font-weight:700; color:#fff;}
+  .pin-role{font-size:11.5px; color:#9fb0c8; font-family:'Space Mono';}
+
+  /* ================= ABOUT — ledger / dossier two-column ================= */
+  .about{background:var(--paper);}
+  .about-grid{
+    display:grid; grid-template-columns:.85fr 1.15fr; gap:64px; align-items:start;
+  }
+  .about-figure{
+    background: var(--maroon);
+    border-radius:4px; padding:36px 30px; color:#fff;
+    position:sticky; top:96px;
+  }
+  .about-figure .est{font-family:'Space Mono'; font-size:12px; letter-spacing:.1em; color:var(--gold-soft); text-transform:uppercase;}
+  .about-figure .yrs{font-family:'Fraunces'; font-size:64px; font-weight:700; margin-top:10px; line-height:1;}
+  .about-figure .yrs-lbl{font-size:14px; color:#f1e2d8; margin-top:6px;}
+  .about-figure hr{border:none; border-top:1px solid rgba(255,255,255,.25); margin:26px 0;}
+  .about-figure .addr{font-size:13.5px; line-height:1.7; color:#f1e2d8;}
+  .about-figure .addr b{display:block; color:#fff; font-size:12px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px;}
+
+  .ledger p{font-size:16.5px; line-height:1.75; color:#3a2c22; margin:0 0 22px;}
+  .ledger p:first-of-type::first-letter{
+    font-family:'Fraunces'; font-size:56px; font-weight:700; float:left; line-height:.8;
+    padding-right:10px; padding-top:6px; color:var(--maroon);
+  }
+  .pillars{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--line); margin-top:36px; border:1px solid var(--line);}
+  .pillar{background:var(--paper); padding:22px 20px;}
+  .pillar .n{font-family:'Space Mono'; font-size:11px; color:var(--maroon); letter-spacing:.08em;}
+  .pillar h4{font-family:'Fraunces'; font-size:17px; margin-top:8px; font-weight:600;}
+  .pillar p{font-size:13px; color:#6b5b4d; margin-top:6px; line-height:1.5;}
+
+  /* ================= ENROLL CTA — admission ticket ================= */
+  .enroll{background:var(--cream-2); padding-block:96px;}
+  .ticket{
+    max-width:960px; margin:0 auto;
+    display:grid; grid-template-columns:1fr 260px;
+    background:var(--paper);
+    border-radius:6px;
+    box-shadow:0 30px 60px rgba(51,6,13,.18);
+    position:relative;
+  }
+  .ticket-main{padding:48px 44px;}
+  .ticket-main .eyebrow{color:var(--maroon);}
+  .ticket-main .eyebrow::before{background:var(--maroon);}
+  .ticket-main h2{font-size:clamp(24px,2.8vw,32px); margin-top:14px; font-weight:700;}
+  .ticket-main p{font-size:15.5px; color:#5a4a3c; margin-top:14px; max-width:44ch; line-height:1.6;}
+  .ticket-actions{display:flex; gap:14px; margin-top:28px; flex-wrap:wrap;}
+  .ticket-stub{
+    background:var(--maroon); color:#fff;
+    padding:36px 26px;
+    display:flex; flex-direction:column; justify-content:center; gap:16px;
+    border-left:2px dashed rgba(255,255,255,.35);
+    position:relative;
+  }
+  .ticket-stub::before, .ticket-stub::after{
+    content:''; position:absolute; width:22px;height:22px; border-radius:50%;
+    background:var(--cream-2); left:-11px;
+  }
+  .ticket-stub::before{top:-11px;}
+  .ticket-stub::after{bottom:-11px;}
+  .stub-row{font-size:13px; display:flex; flex-direction:column; gap:3px;}
+  .stub-row b{font-family:'Space Mono'; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--gold-soft);}
+
+  /* ================= CONTACT — directory / footer ================= */
+  .contact{background:var(--navy); color:#e7ecf3;}
+  .contact-grid{
+    display:grid; grid-template-columns:1.1fr 1fr 1fr .9fr; gap:44px;
+    padding-block:72px; border-bottom:1px solid rgba(255,255,255,.1);
+  }
+  .contact-col h4{
+    font-family:'Space Mono'; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--gold-soft); margin-bottom:18px;
+  }
+  .contact-col .brand-word{color:#fff;}
+  .contact-col p, .contact-col a{font-size:14px; color:#c4cddc; line-height:1.9; text-decoration:none; display:block;}
+  .contact-col a:hover{color:#fff;}
+  .contact-tagline{font-family:'Fraunces'; font-style:italic; font-size:15px; color:#f1e2d8; margin-top:16px; line-height:1.5;}
+  .qr-box{
+    width:96px;height:96px; background:#fff; border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Mono'; font-size:10px; color:var(--navy); text-align:center; font-weight:700;
+    background-image:
+      repeating-linear-gradient(45deg, #0f1e33 0 4px, #fff 4px 8px);
+    background-size: 60% 60%; background-position:center 14px; background-repeat:no-repeat;
+  }
+  .qr-cap{font-size:11px; color:#9fb0c8; margin-top:8px;}
+  .foot-bottom{
+    padding: 20px 0; display:flex; justify-content:space-between; align-items:center;
+    font-size:12.5px; color:#8493ab; flex-wrap:wrap; gap:10px;
+  }
+
+  /* ================= responsive ================= */
+  @media (max-width:920px){
+    .nav-links{display:none;}
+    .hero-grid{grid-template-columns:1fr; min-height:auto; padding-top:24px; padding-bottom:48px;}
+    .hero-visual{height:400px; margin-top:20px;}
+    .rc-main{width:240px;}
+    .roster{grid-template-columns:repeat(2,1fr);}
+    .proof-frame{padding:44px 22px;}
+    .stat-row{grid-template-columns:repeat(2,1fr); row-gap:32px;}
+    .stat{border-right:none; border-bottom:1px solid rgba(255,255,255,.14); padding-bottom:24px;}
+    .testimonial-strip{grid-template-columns:1fr;}
+    .about-grid{grid-template-columns:1fr; gap:36px;}
+    .about-figure{position:static;}
+    .pillars{grid-template-columns:1fr;}
+    .ticket{grid-template-columns:1fr;}
+    .ticket-stub{border-left:none; border-top:2px dashed rgba(255,255,255,.35);}
+    .ticket-stub::before{left:calc(50% - 11px); top:-11px;}
+    .ticket-stub::after{left:calc(50% - 11px); bottom:-11px; top:auto;}
+    .contact-grid{grid-template-columns:1fr 1fr; gap:36px;}
+  }
+  @media (max-width:600px){
+    .wrap{padding-inline:16px;}
+    .section{padding-block:64px;}
+    .roster{grid-template-columns:1fr;}
+    .also-row{padding:22px 20px;}
+    .contact-grid{grid-template-columns:1fr;}
+    body{font-size:15px;}
+  }
+</style>
+
+<div class="concept-note">
+  <b>DESIGN CONCEPT — "The Results Wall"</b> · Public website, grouped by layout: Hero banner · Program roster · Proof/results certificate band · About dossier · Enrollment ticket · Contact directory. Real OBIAS content used throughout; scroll to review each treatment.
+</div>
+
+<!-- NAV -->
+<nav class="site">
+  <div class="nav-inner">
+    <div class="brand">
+      <div class="brand-mark">O</div>
+      <div>
+        <div class="brand-word">OBIAS</div>
+        <div class="brand-sub">Nursing &amp; Allied Review Center</div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="#home">Home</a>
+      <a href="#programs">Programs</a>
+      <a href="#results">Results</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#contact" style="padding:10px 18px; font-size:13.5px;">Inquire</a>
+      <a class="btn btn-primary" href="#enroll">Enroll Now →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ 1. HERO — diagonal banner ============ -->
+<header class="hero" id="home">
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <div class="eyebrow">20+ Years of Excellence</div>
+      <h1>Pass the boards.
+        <em>Your partner in passing, your future in healthcare.</em>
+      </h1>
+      <p class="lede">
+        Comprehensive review programs in Nursing, Midwifery, Medical Technology and Physical
+        Therapy — built by experienced instructors with a proven record of thousands of
+        successful reviewees.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-gold" href="#enroll">Enroll Now →</a>
+        <a class="btn btn-ghost" style="border-color:rgba(255,255,255,.5); color:#fff;" href="#programs">View Programs</a>
+      </div>
+      <div class="hero-chips">
+        <div class="hero-chip"><span class="dot"></span>Comprehensive Review Materials</div>
+        <div class="hero-chip"><span class="dot"></span>Proven Results</div>
+        <div class="hero-chip"><span class="dot"></span>Experienced Review Instructors</div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="result-card rc-stat">
+        <div class="rc-num">1000s</div>
+        <div class="rc-label">of successful reviewees now serving the healthcare community</div>
+      </div>
+      <div class="result-card rc-main">
+        <div class="rc-tag">Reviewee Record No. 0417</div>
+        <h3>Certificate of Completion</h3>
+        <div class="rc-name">Maria S.</div>
+        <div class="rc-role">NLE Passer, Batch 2024</div>
+        <div class="rc-badge">HIGH<br>PASSING<br>RATE</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-banner">
+    <div class="banner-inner">
+      <span class="tag">Now Accepting Enrollees</span>
+      <span class="sep">/</span>
+      <span>Jinyang Bldg. #1, Manila Doctors Access Road, Almanza Uno, Las Piñas City</span>
+      <span class="sep">/</span>
+      <span>0917 165 4780</span>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 2. PROGRAMS — roster / ticket grid ============ -->
+<section class="section programs" id="programs">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Review Programs</div>
+      <h2>Four tracks. One standard of rigor.</h2>
+      <p>Comprehensive review programs designed to help you pass and excel — each led by
+        instructors who know the exam from the inside.</p>
+    </div>
+
+    <div class="roster">
+      <div class="roster-card">
+        <div class="roster-index"><span class="code">PRG · 01</span><span class="status">Open</span></div>
+        <h3>Nursing (NLE)</h3>
+        <p>Comprehensive review for future Registered Nurses.</p>
+        <a class="roster-link" href="#">Learn more →</a>
+      </div>
+      <div class="roster-card">
+        <div class="roster-index"><span class="code">PRG · 02</span><span class="status">Open</span></div>
+        <h3>Midwifery</h3>
+        <p>Build a brighter future in midwifery practice.</p>
+        <a class="roster-link" href="#">Learn more →</a>
+      </div>
+      <div class="roster-card">
+        <div class="roster-index"><span class="code">PRG · 03</span><span class="status">Open</span></div>
+        <h3>Medical Technology</h3>
+        <p>Pass the MedTech licensure exam with confidence.</p>
+        <a class="roster-link" href="#">Learn more →</a>
+      </div>
+      <div class="roster-card">
+        <div class="roster-index"><span class="code">PRG · 04</span><span class="status">Open</span></div>
+        <h3>Physical Therapy</h3>
+        <p>Achieve your goals in allied health practice.</p>
+        <a class="roster-link" href="#">Learn more →</a>
+      </div>
+    </div>
+
+    <div class="also-row">
+      <div>
+        <div class="also-label">Also Offering</div>
+      </div>
+      <div class="also-list">
+        <span><span class="chk">✓</span> Seminar &amp; Training</span>
+        <span><span class="chk">✓</span> Caregiving Course</span>
+        <span><span class="chk">✓</span> Foreign Language Skills</span>
+      </div>
+      <a class="btn btn-gold" href="#">View All Programs →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. PROOF / RESULTS — certificate band ============ -->
+<section class="section proof" id="results">
+  <div class="proof-frame">
+    <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
+    <div class="proof-head">
+      <div class="eyebrow">Track Record</div>
+      <h2>Real reviewees. Real results.</h2>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num">20+</div><div class="lbl">Years of Excellence</div></div>
+      <div class="stat"><div class="num">1,000s</div><div class="lbl">Successful Reviewees</div></div>
+      <div class="stat"><div class="num">High</div><div class="lbl">Passing Rate</div></div>
+      <div class="stat"><div class="num">Many</div><div class="lbl">Healthcare Professionals Now Serving the Community</div></div>
+    </div>
+
+    <div class="testimonial-strip">
+      <div class="pin-card">
+        <p class="pin-quote">"Obias Review Center gave me the confidence and knowledge I needed to pass the NLE. Highly recommended!"</p>
+        <div class="pin-who">
+          <div class="pin-avatar">MS</div>
+          <div><div class="pin-name">Maria S.</div><div class="pin-role">NLE Passer</div></div>
+        </div>
+      </div>
+      <div class="pin-card">
+        <p class="pin-quote">"The instructors are very approachable and the materials are comprehensive. Worth it!"</p>
+        <div class="pin-who">
+          <div class="pin-avatar">JD</div>
+          <div><div class="pin-name">John D.</div><div class="pin-role">MedTech Passer</div></div>
+        </div>
+      </div>
+      <div class="pin-card">
+        <p class="pin-quote">"A big thank you to Obias for helping me achieve my dream. Excellent review experience!"</p>
+        <div class="pin-who">
+          <div class="pin-avatar">AM</div>
+          <div><div class="pin-name">Alyssa M.</div><div class="pin-role">Midwifery Passer</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. ABOUT — dossier / ledger ============ -->
+<section class="section about" id="about">
+  <div class="wrap about-grid">
+    <div class="about-figure">
+      <div class="est">Est. &amp; Operating</div>
+      <div class="yrs">20+</div>
+      <div class="yrs-lbl">years preparing future healthcare professionals</div>
+      <hr>
+      <div class="addr">
+        <b>Main Center</b>
+        Jinyang Bldg. #1<br>
+        Manila Doctors Access Road<br>
+        Almanza Uno, Las Piñas City
+      </div>
+    </div>
+    <div class="ledger">
+      <div class="eyebrow" style="margin-bottom:16px;">About OBIAS</div>
+      <p>OBIAS Nursing &amp; Allied Courses Review Center has spent more than two decades preparing
+        future healthcare professionals for licensure — built on the belief that a rigorous,
+        well-taught review is the single greatest predictor of a passing score.</p>
+      <p>Every reviewee works with experienced instructors and structured, continually updated
+        materials across Nursing, Midwifery, Medical Technology and Physical Therapy — the same
+        standard that has carried thousands of reviewees to a passing rate the center has built
+        its name on.</p>
+      <div class="pillars">
+        <div class="pillar">
+          <div class="n">01</div>
+          <h4>Experienced Instructors</h4>
+          <p>Learn from industry experts and topnotchers.</p>
+        </div>
+        <div class="pillar">
+          <div class="n">02</div>
+          <h4>Comprehensive Materials</h4>
+          <p>Updated and structured review resources.</p>
+        </div>
+        <div class="pillar">
+          <div class="n">03</div>
+          <h4>Proven Results</h4>
+          <p>High passing rate and real success stories.</p>
+        </div>
+        <div class="pillar">
+          <div class="n">04</div>
+          <h4>Affordable Programs</h4>
+          <p>Quality review at accessible rates.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. ENROLL CTA — admission ticket ============ -->
+<section class="enroll" id="enroll">
+  <div class="wrap">
+    <div class="ticket">
+      <div class="ticket-main">
+        <div class="eyebrow">Admissions Open</div>
+        <h2>Be part of our success story.</h2>
+        <p>Enroll now and take the next step toward your healthcare career — seats are limited
+          per batch, and enrollment is open for the upcoming review schedule.</p>
+        <div class="ticket-actions">
+          <a class="btn btn-primary" href="#contact">Enroll Now →</a>
+          <a class="btn btn-ghost" href="#contact">Ask a Question</a>
+        </div>
+      </div>
+      <div class="ticket-stub">
+        <div class="stub-row"><b>Program</b> Choose on inquiry</div>
+        <div class="stub-row"><b>Center</b> Las Piñas City</div>
+        <div class="stub-row"><b>Status</b> Now Accepting Enrollees</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. CONTACT — directory / footer ============ -->
+<footer class="contact" id="contact">
+  <div class="wrap contact-grid">
+    <div class="contact-col">
+      <div class="brand-word" style="font-size:19px;">OBIAS</div>
+      <div class="contact-tagline">"Your Success Is Our Mission!"</div>
+    </div>
+    <div class="contact-col">
+      <h4>Get in Touch</h4>
+      <a href="tel:09171654780">0917 165 4780</a>
+      <a href="tel:09391262602">0939 126 2602</a>
+      <a href="tel:09515624048">0951 562 4048</a>
+      <a href="tel:09238122649">0923 812 2649</a>
+    </div>
+    <div class="contact-col">
+      <h4>Main Center</h4>
+      <p>Jinyang Bldg. #1<br>Manila Doctors Access Road<br>Almanza Uno, Las Piñas City</p>
+      <a href="mailto:centerofreviewfornursing@gmail.com" style="margin-top:10px;">centerofreviewfornursing@gmail.com</a>
+      <a href="#">Facebook: Obias Nursing &amp; Allied Courses Review Center</a>
+    </div>
+    <div class="contact-col">
+      <h4>Scan to Follow</h4>
+      <div class="qr-box"></div>
+      <div class="qr-cap">Follow us on Facebook for updates &amp; announcements</div>
+    </div>
+  </div>
+  <div class="wrap foot-bottom">
+    <span>© 2026 Obias Nursing &amp; Allied Courses Review Center. All rights reserved.</span>
+    <span>Home · Programs · Results · About · Contact</span>
+  </div>
+</footer>

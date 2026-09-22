@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { Card, ErrorState, LoadingState, StatusBadge } from '@/components/ui';
 import { StudentShell, SectionLabel } from '@/components/student-ui';
-import { pickActiveEnrollment, useMyEnrollments, useMyStudentProfile } from '@/lib/student-hooks';
+import { pickActiveEnrollment, useMyEnrollments, useMyNotifications, useMyStudentProfile } from '@/lib/student-hooks';
 
 interface ClassRecord {
   id: string;
@@ -43,8 +43,13 @@ interface TodaysClass {
 export default function StudentHomePage() {
   const profile = useMyStudentProfile();
   const enrollments = useMyEnrollments();
+  const notifications = useMyNotifications();
   const active = pickActiveEnrollment(enrollments.data);
   const batchId = active?.batchId ?? undefined;
+  const recentNotifications = (notifications.data ?? [])
+    .slice()
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 3);
 
   const todaysClasses = useQuery<TodaysClass[]>({
     queryKey: ['home-todays-classes', batchId],
@@ -98,68 +103,114 @@ export default function StudentHomePage() {
       <p className="text-sm text-slate-500">
         {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
       </p>
-      <h1 className="mb-4 text-xl font-semibold text-slate-900">
-        {profile.data ? `Hi, ${profile.data.user.firstName}` : 'Welcome back'}
+      <h1 className="mb-4 text-xl font-semibold text-slate-900 lg:text-2xl">
+        {profile.data ? `Good day, ${profile.data.user.firstName}!` : 'Welcome back'}
       </h1>
 
-      <SectionLabel>Today&apos;s classes</SectionLabel>
-      <Card className="p-4">
-        {!batchId && (
-          <p className="text-sm text-slate-500">
-            You&apos;re not currently assigned to a batch, so there&apos;s nothing scheduled for today.
-          </p>
-        )}
-        {batchId && todaysClasses.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
-        {batchId && todaysClasses.isError && <p className="text-sm text-red-600">Could not load today&apos;s classes.</p>}
-        {batchId && todaysClasses.data && todaysClasses.data.length === 0 && (
-          <p className="text-sm text-slate-500">No classes scheduled for today. Enjoy the break.</p>
-        )}
-        {batchId && todaysClasses.data && todaysClasses.data.length > 0 && (
-          <ul className="flex flex-col gap-3">
-            {todaysClasses.data.map((item) => (
-              <li key={item.scheduleId} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-                <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-red-700 text-[11px] font-semibold text-white">
-                  {item.startTime}
-                </div>
+      <div className="lg:grid lg:grid-cols-3 lg:items-start lg:gap-6">
+        {/* Main column */}
+        <div className="lg:col-span-2">
+          <SectionLabel>Enrollment status</SectionLabel>
+          <Card className="p-4">
+            {!active && <p className="text-sm text-slate-500">You don&apos;t have an active enrollment yet.</p>}
+            {active && (
+              <div className="flex items-center justify-between">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{item.className}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    {item.courseName} · {item.startTime}–{item.endTime}
-                  </p>
+                  <p className="truncate text-sm font-medium text-slate-900">{active.program.name}</p>
+                  {active.batch && <p className="truncate text-xs text-slate-500">{active.batch.name}</p>}
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+                <StatusBadge status={active.status} />
+              </div>
+            )}
+          </Card>
 
-      <SectionLabel>Enrollment status</SectionLabel>
-      <Card className="p-4">
-        {!active && <p className="text-sm text-slate-500">You don&apos;t have an active enrollment yet.</p>}
-        {active && (
-          <div className="flex items-center justify-between">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900">{active.program.name}</p>
-              {active.batch && <p className="truncate text-xs text-slate-500">{active.batch.name}</p>}
-            </div>
-            <StatusBadge status={active.status} />
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <Link
+              href="/student/learn"
+              className="flex min-h-[44px] items-center justify-center rounded-xl bg-red-700 px-4 py-3 text-sm font-medium text-white active:bg-red-800 lg:hover:bg-red-800"
+            >
+              Continue learning
+            </Link>
+            <Link
+              href="/student/exams"
+              className="flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 lg:hover:bg-slate-50"
+            >
+              View exams
+            </Link>
+            <Link
+              href="/student/progress"
+              className="col-span-2 flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 lg:col-span-1 lg:hover:bg-slate-50"
+            >
+              My performance
+            </Link>
           </div>
-        )}
-      </Card>
+        </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <Link
-          href="/student/learn"
-          className="flex min-h-[44px] items-center justify-center rounded-xl bg-red-700 px-4 py-3 text-sm font-medium text-white active:bg-red-800"
-        >
-          Continue learning
-        </Link>
-        <Link
-          href="/student/exams"
-          className="flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100"
-        >
-          View exams
-        </Link>
+        {/* Right rail (desktop) */}
+        <div className="lg:col-span-1">
+          <div className="mb-2 mt-6 flex items-center justify-between lg:mt-0">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Today&apos;s schedule</h2>
+          </div>
+          <Card className="p-4">
+            {!batchId && (
+              <p className="text-sm text-slate-500">
+                You&apos;re not currently assigned to a batch, so there&apos;s nothing scheduled for today.
+              </p>
+            )}
+            {batchId && todaysClasses.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+            {batchId && todaysClasses.isError && (
+              <p className="text-sm text-red-600">Could not load today&apos;s classes.</p>
+            )}
+            {batchId && todaysClasses.data && todaysClasses.data.length === 0 && (
+              <p className="text-sm text-slate-500">No classes scheduled for today. Enjoy the break.</p>
+            )}
+            {batchId && todaysClasses.data && todaysClasses.data.length > 0 && (
+              <ul className="flex flex-col gap-3">
+                {todaysClasses.data.map((item) => (
+                  <li key={item.scheduleId} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-red-700 text-[11px] font-semibold text-white">
+                      {item.startTime}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{item.className}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {item.courseName} · {item.startTime}–{item.endTime}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <div className="mb-2 mt-6 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Recent announcements</h2>
+            <Link href="/student/notifications" className="text-xs font-medium text-red-700">
+              View all
+            </Link>
+          </div>
+          <Card className="p-4">
+            {notifications.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+            {notifications.data && recentNotifications.length === 0 && (
+              <p className="text-sm text-slate-500">Nothing new. You&apos;re all caught up.</p>
+            )}
+            {recentNotifications.length > 0 && (
+              <ul className="divide-y divide-slate-100">
+                {recentNotifications.map((n) => (
+                  <li key={n.id} className="flex items-start gap-2.5 py-2.5 first:pt-0 last:pb-0">
+                    <span className="mt-1.5 flex h-2 w-2 shrink-0 items-center justify-center">
+                      {!n.readAt && <span className="h-2 w-2 rounded-full bg-red-700" aria-hidden="true" />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{n.title}</p>
+                      {n.body && <p className="truncate text-xs text-slate-500">{n.body}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
       </div>
     </StudentShell>
   );

@@ -13,7 +13,7 @@
 // stopgap, not a substitute for real server-side scoping — flagged in the
 // build report.
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './api-client';
 import { useAuth } from './auth-context';
 
@@ -94,4 +94,58 @@ export function pickActiveEnrollment(enrollments: Enrollment[] | undefined): Enr
     if (match) return match;
   }
   return enrollments[0];
+}
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+// GET /v1/notifications is self-scoped server-side (filtered by the
+// caller's userId in the controller) — no client-side filtering needed,
+// unlike the org-wide list endpoints above.
+export function useMyNotifications() {
+  const { user } = useAuth();
+  return useQuery<Notification[]>({
+    queryKey: ['my-notifications'],
+    enabled: Boolean(user),
+    queryFn: async () => (await apiClient.get<Notification[]>('/v1/notifications')).data,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.patch(`/v1/notifications/${id}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-notifications'] }),
+  });
+}
+
+export interface AttemptSummary {
+  id: string;
+  examId: string;
+  exam: { id: string; title: string; resultRelease: string; passingScore: number };
+  status: string;
+  startedAt: string;
+  submittedAt: string | null;
+  score?: number;
+  maxScore?: number;
+  passed?: boolean;
+}
+
+// GET /v1/attempts/me is self-scoped server-side to the caller's own
+// student profile — real attempt history across every exam, with
+// delayed-release results redacted to status-only until graded.
+export function useMyAttempts() {
+  const { user } = useAuth();
+  return useQuery<AttemptSummary[]>({
+    queryKey: ['my-attempts'],
+    enabled: Boolean(user),
+    queryFn: async () => (await apiClient.get<AttemptSummary[]>('/v1/attempts/me')).data,
+  });
 }

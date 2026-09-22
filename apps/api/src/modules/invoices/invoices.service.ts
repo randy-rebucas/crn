@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InvoiceStatus, PaymentStatus, RefundStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { branchScopeWhere } from '../../common/authz/scope.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateInvoiceDto } from './dto/create-invoice.dto.js';
 
 @Injectable()
@@ -11,17 +13,20 @@ export class InvoicesService {
     private readonly audit: AuditService,
   ) {}
 
-  findAllForOrganization(organizationId: string) {
+  // Scoped by `invoices.view` (blueprint Section 8: branch-specific
+  // financial visibility) — a Finance Officer only sees their own branch's
+  // invoices, never the whole organization's.
+  findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.invoice.findMany({
-      where: { organizationId },
+      where: { organizationId: user.organizationId, ...branchScopeWhere(user, 'invoices.view') },
       include: { payments: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(organizationId: string, id: string) {
+  async findOne(user: AuthenticatedUser, id: string) {
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId: user.organizationId, ...branchScopeWhere(user, 'invoices.view') },
       include: { payments: { include: { receipt: true } } },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');

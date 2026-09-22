@@ -6,6 +6,7 @@ import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -139,7 +140,9 @@ export default function StudentsPage() {
               {data.map((student) => (
                 <tr key={student.id}>
                   <td className="px-4 py-3 font-medium text-slate-900">
-                    {student.user.firstName} {student.user.lastName}
+                    <Link href={`/students/${student.id}`} className="hover:underline">
+                      {student.user.firstName} {student.user.lastName}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{student.user.email}</td>
                   <td className="px-4 py-3 text-slate-600">{student.user.status}</td>

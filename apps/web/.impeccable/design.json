@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-22T01:00:00.000Z",
+  "title": "Design System: OBIAS Nursing & Allied Courses Review Center",
+  "extensions": {
+    "colorMeta": {
+      "maroon": { "role": "primary", "displayName": "Deep Institutional Maroon", "canonical": "#8b1a2b", "tonalRamp": ["#2a0810", "#3f0c17", "#551020", "#6b141f", "#8b1a2b", "#a02033", "#c14a5c", "#e0909e"] },
+      "gold": { "role": "secondary", "displayName": "Achievement Gold", "canonical": "#f5c518", "tonalRamp": ["#4a3a05", "#6b5408", "#93750c", "#b89310", "#d7a13d", "#f5c518", "#f8d454", "#fce9a0"] },
+      "navy": { "role": "tertiary", "displayName": "Deep Navy", "canonical": "#0f1e3d", "tonalRamp": ["#050a15", "#0a1226", "#0f1e3d", "#152238", "#1c2d4d", "#2a3f66", "#4a5c85", "#8592ac"] },
+      "cream": { "role": "neutral", "displayName": "Warm Cream", "canonical": "#fdf6e9", "tonalRamp": ["#8a7a54", "#a8956a", "#c7b184", "#e2d1a8", "#fdf6e9", "#fefbf3", "#fffcf7", "#fffefb"] },
+      "neutral-ink": { "role": "neutral", "displayName": "Slate Ink", "canonical": "#0f172a", "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero H1 only, uppercase, condensed." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles." },
+      "title": { "displayName": "Title", "purpose": "Card and sub-section headings." },
+      "body": { "displayName": "Body", "purpose": "Paragraph copy, blurbs, quotes." },
+      "label": { "displayName": "Label", "purpose": "Eyebrow tags and urgency/proof badges." },
+      "script": { "displayName": "Script Accent", "purpose": "One emotional line per hero only." }
+    },
+    "shadows": [
+      { "name": "floating-badge", "value": "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)", "purpose": "Elements overlapping the hero photograph only (instructor roundel, stats callout)." }
+    ],
+    "motion": [
+      { "name": "hover-color", "value": "color/background-color 150ms ease", "purpose": "Default hover transition for buttons and links; no transform or shadow change." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main CTA action, e.g. 'Enroll Now'.",
+      "html": "<button class=\"ds-btn-primary\">Enroll Now &rarr;</button>",
+      "css": ".ds-btn-primary { background: #8b1a2b; color: #ffffff; font-weight: 700; font-size: 0.875rem; padding: 12px 24px; border: none; border-radius: 6px; transition: background 150ms ease; } .ds-btn-primary:hover { background: #6b141f; } .ds-btn-primary:focus-visible { outline: 2px solid #8b1a2b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary (Outline) Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Lower-commitment action, e.g. 'Learn More'.",
+      "html": "<button class=\"ds-btn-secondary\">Learn More</button>",
+      "css": ".ds-btn-secondary { background: transparent; color: #8b1a2b; font-weight: 700; font-size: 0.875rem; padding: 10px 22px; border: 2px solid #8b1a2b; border-radius: 6px; transition: background 150ms ease, color 150ms ease; } .ds-btn-secondary:hover { background: #8b1a2b; color: #ffffff; } .ds-btn-secondary:focus-visible { outline: 2px solid #8b1a2b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Accent (Gold) Button",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "Panel-level CTA, e.g. 'View All Programs'.",
+      "html": "<button class=\"ds-btn-accent\">View All Programs &rarr;</button>",
+      "css": ".ds-btn-accent { background: #f5c518; color: #6b141f; font-weight: 600; font-size: 0.875rem; padding: 10px 16px; border: none; border-radius: 6px; width: 100%; transition: background 150ms ease; } .ds-btn-accent:hover { background: #d7a13d; }"
+    },
+    {
+      "name": "Program Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Cream card used for programs, offerings, and form containers.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-icon\">N</div><h3 class=\"ds-card-title\">Nursing (NLE)</h3><p class=\"ds-card-body\">Comprehensive review for future RNs.</p></div>",
+      "css": ".ds-card { background: #fdf6e9; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; } .ds-card-icon { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 9999px; background: #8b1a2b; color: #ffffff; font-weight: 700; font-size: 1.125rem; } .ds-card-title { margin-top: 16px; font-family: 'Oswald', sans-serif; font-weight: 600; color: #0f172a; } .ds-card-body { margin-top: 8px; font-size: 0.875rem; color: #475569; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Enrollment inquiry form field.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Full name\" />",
+      "css": ".ds-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-size: 0.875rem; background: #ffffff; } .ds-input:focus { border-color: #dc2626; outline: none; }"
+    },
+    {
+      "name": "Primary Navigation",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Site header with wordmark, links, and persistent enroll CTA.",
+      "html": "<header class=\"ds-nav\"><span class=\"ds-nav-wordmark\">OBIAS Review Center</span><nav class=\"ds-nav-links\"><a href=\"#\">Home</a><a href=\"#\">Offerings</a><a href=\"#\">About</a><a href=\"#\">Contact</a></nav><button class=\"ds-btn-primary\">Enroll Now</button></header>",
+      "css": ".ds-nav { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: #ffffff; border-bottom: 1px solid #e2e8f0; } .ds-nav-wordmark { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 1.125rem; color: #8b1a2b; } .ds-nav-links { display: flex; gap: 24px; font-size: 0.875rem; font-weight: 500; color: #475569; } .ds-nav-links a:hover { color: #8b1a2b; }"
+    },
+    {
+      "name": "Eyebrow Badge",
+      "kind": "chip",
+      "refersTo": "eyebrow-badge-urgency",
+      "description": "Signature urgency/proof tag ('Now Accepting Enrollees!').",
+      "html": "<span class=\"ds-badge\">Now Accepting Enrollees!</span>",
+      "css": ".ds-badge { display: inline-block; background: #f5c518; color: #6b141f; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 12px; border-radius: 4px; }"
+    },
+    {
+      "name": "Icon Badge",
+      "kind": "custom",
+      "refersTo": "icon-badge",
+      "description": "Filled maroon circle with a white line-art icon; leads every program/feature card and appears above stat numbers.",
+      "html": "<div class=\"ds-icon-badge\"><svg viewBox=\"0 0 24 24\" width=\"32\" height=\"32\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 12a8 8 0 1 0 16 0 8 8 0 1 0-16 0\"/><path d=\"M12 8v4l3 3\"/></svg></div>",
+      "css": ".ds-icon-badge { display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 9999px; background: #8b1a2b; color: #ffffff; }"
+    },
+    {
+      "name": "Ribbon Banner",
+      "kind": "custom",
+      "refersTo": "ribbon-banner",
+      "description": "Angled maroon ribbon overlapping the hero photo collage for standout claims ('High Passing Rate!').",
+      "html": "<div class=\"ds-ribbon\">Thousands of Successful Reviewees<br/><strong>High Passing Rate!</strong></div>",
+      "css": ".ds-ribbon { position: relative; display: inline-block; background: #8b1a2b; color: #ffffff; font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase; font-size: 0.8rem; text-align: center; padding: 10px 28px; transform: rotate(-3deg); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); clip-path: polygon(4% 0, 100% 0, 96% 100%, 0% 100%); }"
+    },
+    {
+      "name": "Star-Rated Seal Badge",
+      "kind": "custom",
+      "refersTo": "star-seal",
+      "description": "Circular navy badge with gold ring, uppercase claim, and a 5-star row — the instructor-credibility device overlapping the hero photo.",
+      "html": "<div class=\"ds-seal\"><span>Experienced<br/>Review<br/>Instructors</span><span class=\"ds-seal-stars\">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>",
+      "css": ".ds-seal { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 128px; height: 128px; border-radius: 9999px; background: #0f1e3d; border: 3px solid #f5c518; color: #f5c518; font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; text-align: center; line-height: 1.25; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); } .ds-seal-stars { margin-top: 6px; font-size: 0.6rem; letter-spacing: 1px; }"
+    },
+    {
+      "name": "Testimonial Card",
+      "kind": "card",
+      "refersTo": "testimonial-card",
+      "description": "Quote-first card with a circular reviewee photo, name, and program-passed caption.",
+      "html": "<figure class=\"ds-testimonial\"><blockquote>\"Obias Review Center gave me the confidence and knowledge I needed to pass the NLE.\"</blockquote><figcaption><img class=\"ds-testimonial-avatar\" src=\"avatar.jpg\" alt=\"\"/><div><p class=\"ds-testimonial-name\">Maria S.</p><p class=\"ds-testimonial-role\">NLE Passer</p></div></figcaption></figure>",
+      "css": ".ds-testimonial { border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #ffffff; } .ds-testimonial blockquote { font-size: 0.875rem; color: #334155; margin: 0; } .ds-testimonial figcaption { display: flex; align-items: center; gap: 12px; margin-top: 20px; } .ds-testimonial-avatar { width: 56px; height: 56px; border-radius: 9999px; object-fit: cover; } .ds-testimonial-name { font-size: 0.875rem; font-weight: 600; color: #0f172a; margin: 0; } .ds-testimonial-role { font-size: 0.875rem; color: #64748b; margin: 0; }"
+    },
+    {
+      "name": "Footer Contact Panel",
+      "kind": "custom",
+      "refersTo": "footer",
+      "description": "Two-tone footer: navy 'Get in Touch' phone panel beside a light-gray address/QR panel.",
+      "html": "<div class=\"ds-footer\"><div class=\"ds-footer-navy\"><h3>Get in Touch</h3><p>0917 165 4780</p></div><div class=\"ds-footer-light\"><p>Jinyang Bldg. #1, Manila Doctors Access Road, Almanza Uno, Las Piñas City</p></div></div>",
+      "css": ".ds-footer { display: flex; flex-wrap: wrap; } .ds-footer-navy { background: #0f1e3d; color: #ffffff; padding: 32px; flex: 1 1 260px; } .ds-footer-navy h3 { font-family: 'Oswald', sans-serif; font-weight: 700; margin: 0 0 12px; } .ds-footer-light { background: #f1f5f9; color: #334155; padding: 32px; flex: 2 1 400px; font-size: 0.875rem; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Trusted Ribbon",
+    "overview": "This system reads as a real institution with a 20-year record, not a startup. It takes its cue from OBIAS's own ribbon-and-caduceus seal: maroon and gold rendered with the weight of an emblem, not a gradient — ribbon banners, star-rated badges, and circular seals are structural devices, not decoration. Every section leads with a number, a name, or a result before it leads with an adjective — proof is the decoration.\n\nThe palette is loud where it counts (gold urgency badges, maroon CTAs and ribbons) and quiet everywhere else (cream surfaces, slate body copy). Condensed uppercase headings (Oswald) carry institutional authority; a single script accent (Pacifico) softens the hero with a handwritten, personal touch amid the otherwise formal system. Surfaces stay flat — separation comes from a cream fill or a hairline border, never a drop shadow on ordinary cards — so the maroon and gold accents, and the emblem-style badges, are what draws the eye. Real photography (students, graduates, instructors) is load-bearing evidence, arranged as a diagonal-cut collage in the hero rather than a single rectangular image, giving the top of the page motion without needing animation.",
+    "keyCharacteristics": [
+      "Condensed uppercase display type (Oswald) paired with a single handwritten script accent (Pacifico) for warmth",
+      "Maroon carries authority and action; gold carries urgency and achievement; navy grounds proof (stats, footer)",
+      "Emblem-style devices — ribbon banners, star-rated circular badges, the seal logomark — carry credibility, not generic icon chips",
+      "Flat surfaces separated by cream fill or hairline borders, not shadows; the diagonal photo collage and its overlapping badges are the deliberate exception",
+      "Every section resolves toward an enroll/apply action"
+    ],
+    "rules": [
+      { "name": "The Proof-Color Rule", "body": "Navy is reserved for sections that state a fact (stats, contact/footer). If a section persuades or invites action, it uses maroon or gold, never navy.", "section": "colors" },
+      { "name": "The One Script Rule", "body": "Pacifico appears at most once per page. It marks the emotional headline of a hero; it never appears in body copy, buttons, or navigation.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. A shadow appears only when an element visually floats over other content (an overlapping badge on a photo), never as generic card styling.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do lead every section with a number, name, or fact before an adjective (stats, testimonial names, program names).",
+      "Do keep surfaces flat; use cream fill or a hairline border for separation instead of a shadow.",
+      "Do reserve Pacifico script for exactly one line per page, and only in a hero (or the footer's \"Your Success Is Our Mission!\" tagline).",
+      "Do keep navy sections proof-only (stats, footer contact panel) — never interactive or persuasive copy.",
+      "Do keep a visible \"Enroll Now\" / \"Enroll / Apply Now\" action reachable from the header and from every major section.",
+      "Do front every program/feature card and stat tile with a white line-art icon on solid maroon (or above the number for stats) — icon first, text second.",
+      "Do use real reviewee photography for testimonial avatars when available; fall back to an initial circle only when no photo exists."
+    ],
+    "donts": [
+      "Don't add drop shadows to ordinary cards or buttons — shadows are reserved for elements floating over the hero photo collage (ribbons, seal badge).",
+      "Don't use gold as a large background for anything except urgency/CTA moments (hero backdrop, badges, closing CTA band); it is an accent, not a base color.",
+      "Don't invent numeric claims (exact pass-rate percentages, enrollment counts) beyond the qualitative facts on file in PRODUCT.md.",
+      "Don't replace the diagonal hero photo collage, ribbon banner, or star-rated seal with plain rectangular photos or generic rounded badges — these are the system's signature emblem devices, not optional flourish.",
+      "Don't use the internal app's utilitarian red-700/slate component styling (src/components/ui.tsx) as a reference for this system — the two are intentionally different visual languages for different audiences (public marketing vs. authenticated operate surfaces)."
+    ]
+  }
+}

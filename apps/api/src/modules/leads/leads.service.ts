@@ -33,7 +33,7 @@ export class LeadsService {
     return lead;
   }
 
-  async create(organizationId: string, actorId: string, dto: CreateLeadDto) {
+  async create(organizationId: string, actorId: string | undefined, dto: CreateLeadDto) {
     const lead = await this.prisma.lead.create({
       data: {
         organizationId,
@@ -43,6 +43,7 @@ export class LeadsService {
         phone: dto.phone,
         programInterest: dto.programInterest,
         source: dto.source,
+        message: dto.message,
         assignedToId: dto.assignedToId,
       },
     });

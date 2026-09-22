@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -86,6 +87,15 @@ export default function LoginPage() {
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+          <Link href="/forgot-password" className="hover:text-slate-700 hover:underline">
+            Forgot password?
+          </Link>
+          <Link href="/register" className="hover:text-slate-700 hover:underline">
+            Create a student account
+          </Link>
+        </div>
 
         <div className="mt-6 border-t border-slate-200 pt-4">
           <p className="mb-2 text-xs font-medium text-slate-500">Demo accounts (password: {DEMO_PASSWORD})</p>

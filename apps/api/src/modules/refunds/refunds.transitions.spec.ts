@@ -5,6 +5,21 @@
 // methods against a stub Prisma client instead of importing internals.
 import { RefundStatus } from '@prisma/client';
 import { RefundsService } from './refunds.service.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
+
+const actor: AuthenticatedUser = {
+  id: 'actor-1',
+  organizationId: 'org-1',
+  email: 'actor@example.com',
+  branchIds: ['branch-1'],
+  roles: ['finance_manager'],
+  permissions: [
+    { key: 'refunds.officer_approve', scope: 'BRANCH' },
+    { key: 'refunds.manager_approve', scope: 'BRANCH' },
+    { key: 'refunds.process', scope: 'BRANCH' },
+    { key: 'refunds.view', scope: 'BRANCH' },
+  ],
+};
 
 function makeStubs(initialStatus: RefundStatus) {
   const refund = {
@@ -38,7 +53,7 @@ describe('RefundsService transition guard', () => {
   it('allows Requested -> Officer Approved -> Approved -> Processed in order', async () => {
     const { service } = makeStubs(RefundStatus.REQUESTED);
 
-    await expect(service.officerApprove('org-1', 'actor-1', 'refund-1')).resolves.toMatchObject({
+    await expect(service.officerApprove(actor, 'refund-1')).resolves.toMatchObject({
       status: RefundStatus.OFFICER_APPROVED,
     });
   });
@@ -46,7 +61,7 @@ describe('RefundsService transition guard', () => {
   it('rejects jumping from Requested straight to Approved (skipping officer approval)', async () => {
     const { service } = makeStubs(RefundStatus.REQUESTED);
 
-    await expect(service.managerApprove('org-1', 'actor-1', 'refund-1')).rejects.toThrow(
+    await expect(service.managerApprove(actor, 'refund-1')).rejects.toThrow(
       /Cannot move refund/,
     );
   });
@@ -54,7 +69,7 @@ describe('RefundsService transition guard', () => {
   it('rejects processing a refund that has not been manager-approved', async () => {
     const { service } = makeStubs(RefundStatus.OFFICER_APPROVED);
 
-    await expect(service.process('org-1', 'actor-1', 'refund-1')).rejects.toThrow(
+    await expect(service.process(actor, 'refund-1')).rejects.toThrow(
       /Cannot move refund/,
     );
   });
@@ -62,7 +77,7 @@ describe('RefundsService transition guard', () => {
   it('rejects any transition out of a terminal Processed refund', async () => {
     const { service } = makeStubs(RefundStatus.PROCESSED);
 
-    await expect(service.officerApprove('org-1', 'actor-1', 'refund-1')).rejects.toThrow(
+    await expect(service.officerApprove(actor, 'refund-1')).rejects.toThrow(
       /Cannot move refund/,
     );
   });

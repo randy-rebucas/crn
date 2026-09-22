@@ -5,9 +5,9 @@ import { useAuth } from '@/lib/auth-context';
 import { Card, PageHeader } from '@/components/ui';
 
 const SHORTCUTS: { label: string; href: string; permission: string; description: string }[] = [
-  { label: 'My Classes', href: '/classes', permission: 'classes.view', description: "Today's sessions and rosters" },
-  { label: 'Attendance', href: '/attendance', permission: 'attendance.view', description: 'Mark and review attendance' },
-  { label: 'Grading', href: '/exams', permission: 'exams.grade', description: 'Score attempts awaiting review' },
+  { label: 'My Classes', href: '/instructor/classes', permission: 'classes.view', description: "Today's sessions and rosters" },
+  { label: 'Attendance', href: '/instructor/attendance', permission: 'attendance.view', description: 'Mark and review attendance' },
+  { label: 'Grading', href: '/instructor/grading', permission: 'exams.grade', description: 'Score attempts awaiting review' },
 ];
 
 export default function InstructorHomePage() {

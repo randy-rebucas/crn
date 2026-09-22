@@ -15,24 +15,24 @@ export class PaymentsController {
   @Get()
   @RequirePermissions('payments.view')
   findAll(@CurrentUser() user: AuthenticatedUser, @Query('invoiceId') invoiceId?: string) {
-    return this.payments.findAllForInvoice(user.organizationId, invoiceId);
+    return this.payments.findAllForInvoice(user, invoiceId);
   }
 
   @Post()
   @RequirePermissions('payments.create')
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreatePaymentDto) {
-    return this.payments.create(user.organizationId, user.id, dto);
+    return this.payments.create(user, user.id, dto);
   }
 
   @Patch(':id/verify')
   @RequirePermissions('payments.verify')
   verify(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.payments.verify(user.organizationId, user.id, id);
+    return this.payments.verify(user, user.id, id);
   }
 
   @Patch(':id/reject')
   @RequirePermissions('payments.verify')
   reject(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.payments.reject(user.organizationId, user.id, id);
+    return this.payments.reject(user, user.id, id);
   }
 }

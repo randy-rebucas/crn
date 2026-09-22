@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { useMyEnrollments, pickActiveEnrollment } from '@/lib/student-hooks';
+import { useMyEnrollments, useMyAttempts, pickActiveEnrollment } from '@/lib/student-hooks';
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@/components/ui';
 import { StudentShell, StudentPageHeader } from '@/components/student-ui';
 
@@ -16,11 +16,6 @@ interface ExamItem {
   attemptLimit: number;
   timeLimitMinutes: number | null;
   passingScore: number;
-}
-
-interface MyAttempt {
-  examId: string;
-  status: string;
 }
 
 export default function StudentExamsPage() {
@@ -39,12 +34,7 @@ export default function StudentExamsPage() {
     },
   });
 
-  // GET /v1/attempts/me — real server-side "my attempts across exams",
-  // replacing the old per-device localStorage stopgap.
-  const myAttempts = useQuery<MyAttempt[]>({
-    queryKey: ['attempts', 'me'],
-    queryFn: async () => (await apiClient.get('/v1/attempts/me')).data,
-  });
+  const myAttempts = useMyAttempts();
 
   const attemptCountByExam = new Map<string, number>();
   for (const attempt of myAttempts.data ?? []) {
@@ -53,7 +43,12 @@ export default function StudentExamsPage() {
 
   return (
     <StudentShell>
-      <StudentPageHeader title="Exams" description="Practice, diagnostic, mock, and final exams for your program." />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <StudentPageHeader title="Exams" description="Practice, diagnostic, mock, and final exams for your program." />
+        <Link href="/student/progress" className="mt-1 shrink-0 text-xs font-medium text-red-700">
+          My performance
+        </Link>
+      </div>
 
       {enrollments.isLoading && <LoadingState />}
       {enrollments.isError && <ErrorState message="Could not load your enrollment." />}

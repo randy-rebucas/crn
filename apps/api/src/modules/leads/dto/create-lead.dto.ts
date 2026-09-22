@@ -22,6 +22,10 @@ export class CreateLeadDto {
 
   @IsOptional()
   @IsString()
+  message?: string;
+
+  @IsOptional()
+  @IsString()
   branchId?: string;
 
   @IsOptional()

@@ -15,31 +15,31 @@ export class RefundsController {
   @Get()
   @RequirePermissions('refunds.view')
   findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.refunds.findAllForOrganization(user.organizationId);
+    return this.refunds.findAllForOrganization(user);
   }
 
   @Get(':id')
   @RequirePermissions('refunds.view')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.refunds.findOne(user.organizationId, id);
+    return this.refunds.findOne(user, id);
   }
 
   @Post()
   @RequirePermissions('refunds.create')
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateRefundDto) {
-    return this.refunds.create(user.organizationId, user.id, dto);
+    return this.refunds.create(user, user.id, dto);
   }
 
   @Patch(':id/officer-approve')
   @RequirePermissions('refunds.officer_approve')
   officerApprove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.refunds.officerApprove(user.organizationId, user.id, id);
+    return this.refunds.officerApprove(user, id);
   }
 
   @Patch(':id/manager-approve')
   @RequirePermissions('refunds.manager_approve')
   managerApprove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.refunds.managerApprove(user.organizationId, user.id, id);
+    return this.refunds.managerApprove(user, id);
   }
 
   // Reject can happen at either step of the chain, so it needs whichever
@@ -60,6 +60,6 @@ export class RefundsController {
   @Patch(':id/process')
   @RequirePermissions('refunds.process')
   process(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.refunds.process(user.organizationId, user.id, id);
+    return this.refunds.process(user, id);
   }
 }

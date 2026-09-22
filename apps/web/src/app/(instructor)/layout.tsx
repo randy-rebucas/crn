@@ -12,9 +12,9 @@ import { useAuth } from '@/lib/auth-context';
 // same as (dashboard)/layout.tsx, not a hardcoded role check.
 const NAV_ITEMS: { label: string; href: string; permission?: string }[] = [
   { label: 'Today', href: '/instructor' },
-  { label: 'Classes', href: '/classes', permission: 'classes.view' },
-  { label: 'Attendance', href: '/attendance', permission: 'attendance.view' },
-  { label: 'Grading', href: '/exams', permission: 'exams.grade' },
+  { label: 'Classes', href: '/instructor/classes', permission: 'classes.view' },
+  { label: 'Attendance', href: '/instructor/attendance', permission: 'attendance.view' },
+  { label: 'Grading', href: '/instructor/grading', permission: 'exams.grade' },
 ];
 
 export default function InstructorLayout({ children }: { children: React.ReactNode }) {
