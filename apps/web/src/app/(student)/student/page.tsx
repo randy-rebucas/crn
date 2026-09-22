@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { Card, ErrorState, LoadingState, StatusBadge } from '@/components/ui';
-import { StudentShell, SectionLabel } from '@/components/student-ui';
+import { Chevron, SectionLabel, StudentShell, icons } from '@/components/student-ui';
 import { pickActiveEnrollment, useMyEnrollments, useMyNotifications, useMyStudentProfile } from '@/lib/student-hooks';
 
 interface ClassRecord {
@@ -30,16 +30,35 @@ interface TodaysClass {
   endTime: string;
 }
 
+interface ExamItem {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  programId: string | null;
+  attemptLimit: number;
+  timeLimitMinutes: number | null;
+}
+
+const QUICK_LINKS = [
+  { label: 'Continue learning', href: '/student/learn', icon: icons.learn },
+  { label: 'Take an exam', href: '/student/exams', icon: icons.exams },
+  { label: 'My performance', href: '/student/progress', icon: icons.progress },
+  { label: 'Class schedule', href: '/student/schedule', icon: icons.schedule },
+];
+
 // GAP: same as schedule/page.tsx — `GET /v1/classes` has no batchId filter,
 // so we fetch every class in the org and narrow to the active batch
 // client-side, then fan out a schedules request per class to find today's
 // meetings. Fine for a small cohort; a `GET /v1/schedules?batchId=` (or a
 // combined "my schedule today" endpoint) would remove the fan-out.
 //
-// Home is a single at-a-glance card stack — today's classes first (the
-// thing a student actually opens their phone to check), then enrollment
-// status, then two large tap targets into Learn/Exams. Not a shrunk-down
-// version of the admin dashboard.
+// Home is a single at-a-glance card stack: hero greeting, enrollment
+// status, quick actions, and available exams in the main column; today's
+// schedule and recent announcements in the right rail (stacked below on
+// mobile). No course-completion-percent or exam-due-date data exists
+// server-side, so this deliberately doesn't fabricate progress rings or
+// countdown badges — every number here traces back to a real endpoint.
 export default function StudentHomePage() {
   const profile = useMyStudentProfile();
   const enrollments = useMyEnrollments();
@@ -80,6 +99,20 @@ export default function StudentHomePage() {
     },
   });
 
+  // Same available-to-take framing as exams/page.tsx: PUBLISHED exams for
+  // the active program, minus ones already exhausted. No due-date data
+  // exists server-side, so this reads as "open now" rather than a
+  // calendar of upcoming dates.
+  const exams = useQuery<ExamItem[]>({
+    queryKey: ['home-exams', active?.programId],
+    enabled: Boolean(active),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ExamItem[]>('/v1/exams');
+      return data.filter((e) => !e.programId || e.programId === active!.programId);
+    },
+  });
+  const availableExams = (exams.data ?? []).slice(0, 3);
+
   const isLoading = profile.isLoading || enrollments.isLoading;
   const isError = profile.isError || enrollments.isError;
 
@@ -98,24 +131,40 @@ export default function StudentHomePage() {
     );
   }
 
+  const firstName = profile.data?.user.firstName;
+
   return (
     <StudentShell>
-      <p className="text-sm text-slate-500">
-        {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-      </p>
-      <h1 className="mb-4 text-xl font-semibold text-slate-900 lg:text-2xl">
-        {profile.data ? `Good day, ${profile.data.user.firstName}!` : 'Welcome back'}
-      </h1>
+      {/* Hero greeting */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-700 via-red-700 to-red-900 px-5 py-6 text-white lg:px-8 lg:py-8">
+        <span className="pointer-events-none absolute -right-6 -top-6 text-red-600/40 [&>svg]:h-32 [&>svg]:w-32 lg:[&>svg]:h-40 lg:[&>svg]:w-40">
+          {icons.certificate}
+        </span>
+        <p className="text-xs font-medium uppercase tracking-wide text-red-200">
+          {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
+        <h1 className="relative mt-1 text-2xl font-semibold lg:text-3xl">
+          {firstName ? `Good day, ${firstName}!` : 'Welcome back'}
+        </h1>
+        <p className="relative mt-1 max-w-sm text-sm text-red-100">
+          Keep learning. You&apos;re one step closer to your goal.
+        </p>
+      </div>
 
       <div className="lg:grid lg:grid-cols-3 lg:items-start lg:gap-6">
         {/* Main column */}
         <div className="lg:col-span-2">
           <SectionLabel>Enrollment status</SectionLabel>
           <Card className="p-4">
-            {!active && <p className="text-sm text-slate-500">You don&apos;t have an active enrollment yet.</p>}
+            {!active && (
+              <p className="text-sm text-slate-500">You don&apos;t have an active enrollment yet.</p>
+            )}
             {active && (
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-700 text-white [&>svg]:h-6 [&>svg]:w-6">
+                  {icons.learn}
+                </span>
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-900">{active.program.name}</p>
                   {active.batch && <p className="truncate text-xs text-slate-500">{active.batch.name}</p>}
                 </div>
@@ -124,26 +173,54 @@ export default function StudentHomePage() {
             )}
           </Card>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <Link
-              href="/student/learn"
-              className="flex min-h-[44px] items-center justify-center rounded-xl bg-red-700 px-4 py-3 text-sm font-medium text-white active:bg-red-800 lg:hover:bg-red-800"
-            >
-              Continue learning
-            </Link>
-            <Link
-              href="/student/exams"
-              className="flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 lg:hover:bg-slate-50"
-            >
-              View exams
-            </Link>
-            <Link
-              href="/student/progress"
-              className="col-span-2 flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 lg:col-span-1 lg:hover:bg-slate-50"
-            >
-              My performance
-            </Link>
+          <SectionLabel>Quick actions</SectionLabel>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {QUICK_LINKS.map((item, i) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex min-h-[44px] flex-col items-center gap-2 rounded-xl px-4 py-4 text-center text-sm font-medium transition ${
+                  i === 0
+                    ? 'bg-red-700 text-white active:bg-red-800 lg:hover:bg-red-800'
+                    : 'border border-slate-200 bg-white text-slate-700 active:bg-slate-100 lg:hover:bg-slate-50'
+                }`}
+              >
+                <span className={`[&>svg]:h-5 [&>svg]:w-5 ${i === 0 ? 'text-white' : 'text-red-700'}`}>{item.icon}</span>
+                {item.label}
+              </Link>
+            ))}
           </div>
+
+          <SectionLabel>Available exams</SectionLabel>
+          <Card className="divide-y divide-slate-100 p-0">
+            {!active && (
+              <p className="p-4 text-sm text-slate-500">Exams appear here once you&apos;re enrolled in a program.</p>
+            )}
+            {active && exams.isLoading && <p className="p-4 text-sm text-slate-500">Loading…</p>}
+            {active && exams.isError && <p className="p-4 text-sm text-red-600">Could not load exams.</p>}
+            {active && exams.data && exams.data.length === 0 && (
+              <p className="p-4 text-sm text-slate-500">Nothing published for your program yet.</p>
+            )}
+            {availableExams.length > 0 &&
+              availableExams.map((exam) => (
+                <Link
+                  key={exam.id}
+                  href={`/student/exams/${exam.id}`}
+                  className="flex items-center gap-3 p-4 active:bg-slate-50 lg:hover:bg-slate-50"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700 [&>svg]:h-5 [&>svg]:w-5">
+                    {icons.exams}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-900">{exam.title}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      {exam.type} · {exam.timeLimitMinutes ? `${exam.timeLimitMinutes} min` : 'No time limit'}
+                    </p>
+                  </div>
+                  <Chevron open={false} />
+                </Link>
+              ))}
+          </Card>
         </div>
 
         {/* Right rail (desktop) */}

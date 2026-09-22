@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Oswald, Pacifico, Poppins } from "next/font/google";
+import { Geist_Mono, Oswald, Poppins } from "next/font/google";
+import localFont from "next/font/local";
 import { Providers } from "@/lib/providers";
 import "./globals.css";
 
@@ -15,10 +16,11 @@ const oswald = Oswald({
   weight: ["500", "600", "700"],
 });
 
-const pacifico = Pacifico({
-  variable: "--font-pacifico",
-  subsets: ["latin"],
+const brittanySignature = localFont({
+  variable: "--font-script",
+  src: "../../public/fonts/brittany-signature-script-cufonfonts-webfont/BrittanySignatureScript.woff",
   weight: "400",
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -39,7 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${poppins.variable} ${oswald.variable} ${pacifico.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${poppins.variable} ${oswald.variable} ${brittanySignature.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>

@@ -1,44 +1,92 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { AdminSidebar, AdminTopBar, MobileNavDrawer, adminIcons, type AdminNavGroup } from '@/components/admin-shell';
+
+interface Notification {
+  id: string;
+  readAt: string | null;
+}
 
 // Nav is role-aware, not role-name-aware (blueprint Section 25): each item
 // names the permission that unlocks it, and the guard is the same
 // `hasPermission` check the API itself enforces — never a hardcoded role
-// check like `user.roles.includes('admin')`.
-const NAV_ITEMS: { label: string; href: string; permission?: string }[] = [
-  { label: 'Dashboard', href: '/dashboard' },
-  { label: 'Students', href: '/students', permission: 'students.view' },
-  { label: 'Enrollments', href: '/enrollments', permission: 'enrollments.view' },
-  { label: 'Programs', href: '/programs', permission: 'programs.view' },
-  { label: 'Courses', href: '/courses', permission: 'courses.view' },
-  { label: 'Curriculum', href: '/curriculum', permission: 'courses.view' },
-  { label: 'Content', href: '/content', permission: 'content.view' },
-  { label: 'Classes', href: '/classes', permission: 'classes.view' },
-  { label: 'Schedule', href: '/schedules', permission: 'schedules.view' },
-  { label: 'Attendance', href: '/attendance', permission: 'attendance.view' },
-  { label: 'Exams', href: '/exams', permission: 'exams.view' },
-  { label: 'Results', href: '/results', permission: 'exams.grade' },
-  { label: 'Finance', href: '/finance', permission: 'payments.view' },
-  { label: 'Leads', href: '/leads', permission: 'leads.view' },
-  { label: 'Admissions', href: '/admissions', permission: 'admissions.view' },
-  { label: 'Reports', href: '/reports', permission: 'reports.view' },
-  { label: 'Staff', href: '/staff', permission: 'staff.view' },
-  { label: 'Branches', href: '/branches', permission: 'branches.view' },
-  { label: 'Notifications', href: '/notifications' },
-  { label: 'Roles', href: '/roles', permission: 'roles.manage' },
-  { label: 'Permissions', href: '/permissions', permission: 'permissions.manage' },
-  { label: 'Audit Logs', href: '/audit-logs', permission: 'audit_logs.view' },
-  { label: 'Settings', href: '/settings', permission: 'settings.view' },
+// check like `user.roles.includes('admin')`. Grouped to match the
+// reference dashboard's sectioned sidebar (Users Management, Courses &
+// Content, ...); a group of one item (Dashboard, Reports, ...) renders as
+// a plain top-level link instead of a collapsible section.
+const NAV_GROUPS: AdminNavGroup[] = [
+  { label: 'Overview', items: [{ label: 'Dashboard', href: '/dashboard', icon: adminIcons.home }] },
+  {
+    label: 'Enrollment Pipeline',
+    items: [
+      { label: 'Leads', href: '/leads', icon: adminIcons.funnel, permission: 'leads.view' },
+      { label: 'Admissions', href: '/admissions', icon: adminIcons.clipboardCheck, permission: 'admissions.view' },
+      { label: 'Enrollments', href: '/enrollments', icon: adminIcons.userPlus, permission: 'enrollments.view' },
+      { label: 'Students', href: '/students', icon: adminIcons.users, permission: 'students.view' },
+    ],
+  },
+  {
+    label: 'Courses & Content',
+    items: [
+      { label: 'Programs', href: '/programs', icon: adminIcons.layers, permission: 'programs.view' },
+      { label: 'Courses', href: '/courses', icon: adminIcons.learn, permission: 'courses.view' },
+      { label: 'Curriculum', href: '/curriculum', icon: adminIcons.layers, permission: 'courses.view' },
+      { label: 'Content', href: '/content', icon: adminIcons.fileText, permission: 'content.view' },
+      { label: 'Classes', href: '/classes', icon: adminIcons.users, permission: 'classes.view' },
+      { label: 'Schedule', href: '/schedules', icon: adminIcons.schedule, permission: 'schedules.view' },
+    ],
+  },
+  {
+    label: 'Exams & Attendance',
+    items: [
+      { label: 'Attendance', href: '/attendance', icon: adminIcons.checkSquare, permission: 'attendance.view' },
+      { label: 'Exams', href: '/exams', icon: adminIcons.exams, permission: 'exams.view' },
+      { label: 'Results', href: '/results', icon: adminIcons.barChart, permission: 'exams.grade' },
+    ],
+  },
+  {
+    label: 'Payments & Billing',
+    items: [{ label: 'Finance', href: '/finance', icon: adminIcons.creditCard, permission: 'payments.view' }],
+  },
+  {
+    label: 'Reports & Analytics',
+    items: [{ label: 'Reports', href: '/reports', icon: adminIcons.pieChart, permission: 'reports.view' }],
+  },
+  {
+    label: 'Users Management',
+    items: [
+      { label: 'Staff', href: '/staff', icon: adminIcons.users, permission: 'staff.view' },
+      { label: 'Branches', href: '/branches', icon: adminIcons.mapPin, permission: 'branches.view' },
+      { label: 'Roles', href: '/roles', icon: adminIcons.shield, permission: 'roles.manage' },
+      { label: 'Permissions', href: '/permissions', icon: adminIcons.key, permission: 'permissions.manage' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { label: 'Notifications', href: '/notifications', icon: adminIcons.bell },
+      { label: 'Audit Logs', href: '/audit-logs', icon: adminIcons.history, permission: 'audit_logs.view' },
+      { label: 'Settings', href: '/settings', icon: adminIcons.settings, permission: 'settings.view' },
+    ],
+  },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, logout, hasPermission } = useAuth();
+  const { user, isLoading, hasPermission } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const notificationsQuery = useQuery<Notification[]>({
+    queryKey: ['notifications'],
+    queryFn: async () => (await apiClient.get('/v1/notifications')).data,
+    enabled: Boolean(user),
+  });
+  const unreadCount = notificationsQuery.data?.filter((n) => !n.readAt).length ?? 0;
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -46,40 +94,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isLoading, user, router]);
 
+  const visibleGroups = useMemo(() => {
+    if (!user) return [];
+    return NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.permission || hasPermission(item.permission)),
+    })).filter((group) => group.items.length > 0);
+  }, [user, hasPermission]);
+
   if (isLoading || !user) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>;
   }
 
-  const visibleItems = NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission));
+  const allVisibleItems = visibleGroups.flatMap((group) => group.items);
 
   return (
-    <div className="flex flex-1">
-      <aside className="hidden w-56 flex-col border-r border-slate-200 bg-white p-4 md:flex">
-        <div className="mb-6 text-sm font-semibold text-slate-900">OBIAS Admin</div>
-        <nav className="flex flex-1 flex-col gap-1 text-sm text-slate-600">
-          {visibleItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`rounded-md px-2 py-1.5 transition ${
-                  active ? 'bg-red-50 font-medium text-red-700' : 'hover:bg-slate-100'
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <button
-          onClick={() => logout()}
-          className="mt-4 rounded-md border border-slate-200 px-2 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-100"
-        >
-          Sign out
-        </button>
-      </aside>
-      <main className="flex-1 bg-slate-50 p-6">{children}</main>
+    <div className="flex flex-1 bg-slate-50">
+      <AdminSidebar groups={visibleGroups} />
+      <MobileNavDrawer groups={visibleGroups} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AdminTopBar
+          navItems={allVisibleItems}
+          unreadCount={unreadCount}
+          email={user.email}
+          role={user.roles[0] ?? 'Staff'}
+          onMenuClick={() => setDrawerOpen(true)}
+        />
+        <main className="flex-1 p-4 md:p-6">{children}</main>
+      </div>
     </div>
   );
 }

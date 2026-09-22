@@ -62,7 +62,8 @@ function ResetPasswordForm() {
         <label className="mb-1 block text-sm font-medium text-slate-700">New password</label>
         <input
           type="password"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          placeholder="Enter your new password"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
           {...register('newPassword')}
         />
         {errors.newPassword && <p className="mt-1 text-xs text-red-600">{errors.newPassword.message}</p>}
@@ -71,7 +72,7 @@ function ResetPasswordForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-maroon py-2.5 text-sm font-semibold text-white transition hover:bg-brand-maroon-dark disabled:opacity-50"
       >
         {isSubmitting ? 'Resetting…' : 'Reset password'}
       </button>
@@ -81,14 +82,12 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <main className="flex flex-1 items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-slate-900">Set a new password</h1>
-        <p className="mb-6 text-sm text-slate-500">Choose a new password for your account.</p>
-        <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>
-          <ResetPasswordForm />
-        </Suspense>
-      </div>
-    </main>
+    <div className="w-full max-w-md rounded-2xl border border-white/40 bg-white/80 p-8 shadow-2xl backdrop-blur-md">
+      <h1 className="font-heading text-2xl font-bold text-slate-900">Set a new password</h1>
+      <p className="mb-6 text-sm text-slate-500">Choose a new password for your account.</p>
+      <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>
+        <ResetPasswordForm />
+      </Suspense>
+    </div>
   );
 }

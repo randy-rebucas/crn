@@ -81,7 +81,7 @@ export default function MarketingHomePage() {
               <span className="block text-slate-900">Nursing &amp; Allied Courses</span>
               <span className="block text-brand-maroon">Review Center</span>
             </h1>
-            <p className="font-script mt-3 text-2xl text-slate-800">Preparing Future Healthcare Professionals</p>
+            <p className="font-script mt-3 text-4xl text-slate-800">Preparing Future Healthcare Professionals</p>
             <div className="mt-8 flex flex-wrap gap-3.5">
               <Link
                 href="/contact"
