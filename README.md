@@ -151,13 +151,22 @@ running backend. It's controlled by `NEXT_PUBLIC_USE_MOCKS` (see
 | --- | --- | --- |
 | Super Admin | `superadmin@obias.demo` | `Passw0rd!` |
 | Branch Manager | `branchmanager@obias.demo` | `Passw0rd!` |
+| Owner / Executive | `ownerexecutive@obias.demo` | `Passw0rd!` |
+| Operations Manager | `operationsmanager@obias.demo` | `Passw0rd!` |
 | Academic Director | `academicdirector@obias.demo` | `Passw0rd!` |
+| Lead Instructor | `leadinstructor@obias.demo` | `Passw0rd!` |
 | Instructor | `instructor@obias.demo` | `Passw0rd!` |
+| Content Manager | `contentmanager@obias.demo` | `Passw0rd!` |
+| Exam Administrator | `examadministrator@obias.demo` | `Passw0rd!` |
 | Registrar | `registrar@obias.demo` | `Passw0rd!` |
 | Admissions Officer | `admissions@obias.demo` | `Passw0rd!` |
 | Finance Manager | `financemanager@obias.demo` | `Passw0rd!` |
 | Finance Officer | `financeofficer@obias.demo` | `Passw0rd!` |
+| Cashier | `cashier@obias.demo` | `Passw0rd!` |
 | Front Desk Staff | `frontdesk@obias.demo` | `Passw0rd!` |
+| General Staff | `generalstaff@obias.demo` | `Passw0rd!` |
+| HR Manager | `hrmanager@obias.demo` | `Passw0rd!` |
+| HR Staff | `hrstaff@obias.demo` | `Passw0rd!` |
 | Auditor | `auditor@obias.demo` | `Passw0rd!` |
 | Student | `student@obias.demo` | `Passw0rd!` |
 
