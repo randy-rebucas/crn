@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AttemptStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { SAFE_USER_SELECT } from '../../common/prisma/safe-selects.js';
+import { attemptScopeWhere, getScope } from '../../common/authz/scope.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
 
 // Per-answer grading itself already lives on AttemptsService
 // (`gradeAnswer`) — this module is the missing read side: a gradebook
@@ -11,15 +13,31 @@ import { SAFE_USER_SELECT } from '../../common/prisma/safe-selects.js';
 export class GradesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async forExam(organizationId: string, examId: string) {
+  // Mirrors AttemptsService.resolveGradeScopeWhere: `exams.grade` at
+  // ASSIGNED scope needs the instructor-profile-to-class DB lookup, so it
+  // can't be resolved by the sync `attemptScopeWhere` helper alone.
+  private async resolveGradeScopeWhere(user: AuthenticatedUser) {
+    if (getScope(user, 'exams.grade') === 'ASSIGNED') {
+      const instructor = await this.prisma.instructorProfile.findFirst({
+        where: { userId: user.id, organizationId: user.organizationId },
+      });
+      const instructorProfileId = instructor?.id ?? '__no_instructor_profile__';
+      return {
+        student: { enrollments: { some: { batch: { classes: { some: { instructorProfileId } } } } } },
+      };
+    }
+    return attemptScopeWhere(user, 'exams.grade');
+  }
+
+  async forExam(user: AuthenticatedUser, examId: string) {
     const exam = await this.prisma.exam.findFirst({
-      where: { id: examId, organizationId },
+      where: { id: examId, organizationId: user.organizationId },
       select: { id: true, title: true, passingScore: true },
     });
     if (!exam) throw new NotFoundException('Exam not found');
 
     const attempts = await this.prisma.attempt.findMany({
-      where: { examId },
+      where: { examId, ...(await this.resolveGradeScopeWhere(user)) },
       include: { student: { select: { id: true, user: { select: SAFE_USER_SELECT } } } },
       orderBy: { submittedAt: 'desc' },
     });

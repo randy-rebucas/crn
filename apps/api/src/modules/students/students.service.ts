@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -79,7 +79,27 @@ export class StudentsService {
     return student;
   }
 
+  // roleIds/branchId are opaque ids from client input — without this check
+  // an actor could attach a role or branch belonging to a different
+  // organization, letting that role's permissions or that branch's
+  // branch-scoped data leak into this org (same class of bug fixed in
+  // UsersService.create).
+  private async assertBelongsToOrganization(organizationId: string, roleIds: string[], branchId?: string) {
+    if (roleIds.length > 0) {
+      const found = await this.prisma.role.count({ where: { id: { in: roleIds }, organizationId } });
+      if (found !== new Set(roleIds).size) {
+        throw new BadRequestException('One or more roleIds do not belong to this organization');
+      }
+    }
+    if (branchId) {
+      const branch = await this.prisma.branch.findFirst({ where: { id: branchId, organizationId } });
+      if (!branch) throw new BadRequestException('branchId does not belong to this organization');
+    }
+  }
+
   async create(organizationId: string, actorId: string, dto: CreateStudentDto) {
+    await this.assertBelongsToOrganization(organizationId, dto.roleIds ?? [], dto.branchId);
+
     const passwordHash = await argon2.hash(dto.password);
 
     // The `student` system role is always attached, regardless of `roleIds`:

@@ -32,6 +32,7 @@ export class AuthService {
       {
         secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
         expiresIn: this.config.get<string>('JWT_ACCESS_TTL', '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`,
+        algorithm: 'HS256',
       },
     );
 
@@ -123,7 +124,29 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date() || stored.user.status !== 'ACTIVE') {
+    // A replay of a token that was already rotated out (revoked but not yet
+    // expired) is a compromise signal: a legitimate client never reuses a
+    // refresh token after it rotates. Whether the replay is the thief or the
+    // rightful owner racing them, we can't tell which — so kill every
+    // session for this account rather than just rejecting the one request.
+    if (stored?.revokedAt && stored.expiresAt >= new Date()) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.audit.log({
+        organizationId: stored.user.organizationId,
+        actorId: stored.userId,
+        action: 'auth.refresh_token.reuse_detected',
+        resource: 'user',
+        resourceId: stored.userId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (!stored || stored.expiresAt < new Date() || stored.user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -180,8 +203,16 @@ export class AuthService {
 
     const webOrigin = this.config.get<string>('WEB_ORIGIN', 'http://localhost:3000');
     // TODO: send via a real mail provider instead of logging.
-    // eslint-disable-next-line no-console
-    console.log(`[password-reset] ${email}: ${webOrigin}/reset-password?token=${token}`);
+    // The raw token is only ever logged outside production: application logs
+    // are frequently aggregated somewhere less trusted than the DB, and a
+    // logged token is a live account-takeover credential until it expires.
+    if (this.config.get<string>('NODE_ENV') !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log(`[password-reset] ${email}: ${webOrigin}/reset-password?token=${token}`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn(`[password-reset] requested for ${email}, but no mail provider is configured`);
+    }
 
     await this.audit.log({
       organizationId: user.organizationId,

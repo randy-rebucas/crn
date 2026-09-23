@@ -21,6 +21,6 @@ export class RolesController {
   @Post()
   @RequirePermissions('roles.manage')
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateRoleDto) {
-    return this.roles.create(user.organizationId, user.id, dto);
+    return this.roles.create(user, dto);
   }
 }

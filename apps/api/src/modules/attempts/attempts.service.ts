@@ -2,6 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { AttemptStatus, ContentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { attemptScopeWhere, getScope } from '../../common/authz/scope.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { gradeResponse } from './grading.js';
 import type { SubmitAttemptDto } from './dto/submit-attempt.dto.js';
 
@@ -18,9 +20,30 @@ export class AttemptsService {
     return student;
   }
 
-  findAllForExam(organizationId: string, examId: string) {
+  // `exams.grade` can be granted at ASSIGNED scope (an instructor's own
+  // classes only) — that needs the same instructor-profile-to-class DB
+  // lookup as StudentsService.assignedStudentWhere, so it can't be resolved
+  // by the sync `attemptScopeWhere` helper the way BRANCH can.
+  private async resolveGradeScopeWhere(user: AuthenticatedUser) {
+    if (getScope(user, 'exams.grade') === 'ASSIGNED') {
+      const instructor = await this.prisma.instructorProfile.findFirst({
+        where: { userId: user.id, organizationId: user.organizationId },
+      });
+      const instructorProfileId = instructor?.id ?? '__no_instructor_profile__';
+      return {
+        student: { enrollments: { some: { batch: { classes: { some: { instructorProfileId } } } } } },
+      };
+    }
+    return attemptScopeWhere(user, 'exams.grade');
+  }
+
+  async findAllForExam(user: AuthenticatedUser, examId: string) {
     return this.prisma.attempt.findMany({
-      where: { examId, exam: { organizationId } },
+      where: {
+        examId,
+        exam: { organizationId: user.organizationId },
+        ...(await this.resolveGradeScopeWhere(user)),
+      },
       include: { student: { select: { id: true } } },
       orderBy: { startedAt: 'desc' },
     });
@@ -194,14 +217,19 @@ export class AttemptsService {
   }
 
   async gradeAnswer(
-    organizationId: string,
-    actorId: string,
+    user: AuthenticatedUser,
     attemptId: string,
     questionId: string,
     pointsAwarded: number,
   ) {
+    const organizationId = user.organizationId;
+    const actorId = user.id;
     const attempt = await this.prisma.attempt.findFirst({
-      where: { id: attemptId, exam: { organizationId } },
+      where: {
+        id: attemptId,
+        exam: { organizationId },
+        ...(await this.resolveGradeScopeWhere(user)),
+      },
       include: { exam: true, answers: true },
     });
     if (!attempt) throw new NotFoundException('Attempt not found');

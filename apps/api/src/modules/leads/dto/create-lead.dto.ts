@@ -1,7 +1,8 @@
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateLeadDto {
   @IsString()
+  @MaxLength(200)
   fullName!: string;
 
   @IsOptional()
@@ -10,25 +11,29 @@ export class CreateLeadDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   phone?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   programInterest?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   source?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   message?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   branchId?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   assignedToId?: string;
 }

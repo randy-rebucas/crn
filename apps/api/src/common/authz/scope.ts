@@ -97,6 +97,34 @@ export function requirementSubmissionScopeWhere(user: AuthenticatedUser, permiss
   );
 }
 
+// Scope filter for the Certificate model. Certificate has no `branchId`
+// column of its own — it reaches a branch only through `student.branchId` —
+// so BRANCH narrows on that nested relation instead of a bare column.
+export function certificateScopeWhere(user: AuthenticatedUser, permissionKey: string) {
+  const scope = getScope(user, permissionKey);
+  if (scope === 'BRANCH') return { student: { branchId: { in: user.branchIds } } };
+  if (scope === undefined || scope === 'ORGANIZATION' || scope === 'GLOBAL') return {};
+  throw new ForbiddenException(
+    `"${permissionKey}" scope "${scope}" is not supported by this resource's authorization rule`,
+  );
+}
+
+// Scope filter for the Attempt model (exam attempts/grading). Attempt has no
+// `branchId`/`organizationId` column of its own — it reaches both only
+// through `student` — so BRANCH narrows on `student.branchId`. ASSIGNED (an
+// instructor's own class) needs the same DB lookup as
+// StudentsService.assignedStudentWhere, so it can't be resolved by this sync
+// helper — callers must check for it via `getScope` and use a
+// resource-specific async lookup instead.
+export function attemptScopeWhere(user: AuthenticatedUser, permissionKey: string) {
+  const scope = getScope(user, permissionKey);
+  if (scope === 'BRANCH') return { student: { branchId: { in: user.branchIds } } };
+  if (scope === undefined || scope === 'ORGANIZATION' || scope === 'GLOBAL') return {};
+  throw new ForbiddenException(
+    `"${permissionKey}" scope "${scope}" is not supported by this resource's authorization rule`,
+  );
+}
+
 // Scope filter for the Enrollment model. Enrollment has its own `branchId`
 // column (BRANCH narrows directly on it) but no `userId` — "self" means
 // "belongs to my own StudentProfile", reached through the `student`

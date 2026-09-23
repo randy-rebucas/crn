@@ -33,7 +33,23 @@ export class LeadsService {
     return lead;
   }
 
+  // branchId/assignedToId are opaque ids from client input — without this
+  // check a staff actor could attach a branch or user belonging to a
+  // different organization (same bug class fixed in UsersService.create).
+  private async assertBelongsToOrganization(organizationId: string, branchId?: string, assignedToId?: string) {
+    if (branchId) {
+      const branch = await this.prisma.branch.findFirst({ where: { id: branchId, organizationId } });
+      if (!branch) throw new BadRequestException('branchId does not belong to this organization');
+    }
+    if (assignedToId) {
+      const user = await this.prisma.user.findFirst({ where: { id: assignedToId, organizationId } });
+      if (!user) throw new BadRequestException('assignedToId does not belong to this organization');
+    }
+  }
+
   async create(organizationId: string, actorId: string | undefined, dto: CreateLeadDto) {
+    await this.assertBelongsToOrganization(organizationId, dto.branchId, dto.assignedToId);
+
     const lead = await this.prisma.lead.create({
       data: {
         organizationId,

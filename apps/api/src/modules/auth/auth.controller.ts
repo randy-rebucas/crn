@@ -1,4 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -10,6 +11,9 @@ import { ResetPasswordDto } from './dto/reset-password.dto.js';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Credential-stuffing/brute-force target: much tighter than the global
+  // per-IP default in app.module.ts.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto, @Req() req: Request) {
@@ -19,6 +23,7 @@ export class AuthController {
     });
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshDto, @Req() req: Request) {
@@ -36,12 +41,14 @@ export class AuthController {
 
   // Always 204, whether or not the email matched an account — see the
   // enumeration-safety comment on AuthService.requestPasswordReset.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('password-reset/request')
   @HttpCode(HttpStatus.NO_CONTENT)
   async requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
     await this.authService.requestPasswordReset(dto.email);
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('password-reset/confirm')
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Body() dto: ResetPasswordDto) {

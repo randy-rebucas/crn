@@ -1,4 +1,4 @@
-import { IsArray, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @IsEmail()
@@ -20,9 +20,11 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsArray()
+  @IsUUID(4, { each: true })
   roleIds?: string[];
 
   @IsOptional()
   @IsArray()
+  @IsUUID(4, { each: true })
   branchIds?: string[];
 }

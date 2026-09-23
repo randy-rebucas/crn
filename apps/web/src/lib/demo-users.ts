@@ -45,7 +45,13 @@ const ALL_PERMISSION_KEYS = [
 
 export const DEMO_PASSWORD = 'Passw0rd!';
 
-export const DEMO_USERS: DemoUser[] = [
+// Next.js inlines NEXT_PUBLIC_* references to a literal at build time, so
+// when mocks are off this becomes `false ? [...] : []` and the minifier
+// drops the whole demo-account literal (names, emails, the shared password)
+// from the production bundle rather than just skipping it at runtime.
+export const DEMO_USERS: DemoUser[] =
+  process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
+    ? [
   {
     id: 'user-super-admin',
     organizationId: ORG_ID,
@@ -192,7 +198,8 @@ export const DEMO_USERS: DemoUser[] = [
     branchIds: [BRANCH_MAIN],
     permissions: perms(['results.view', 'exams.view'], 'self'),
   },
-];
+    ]
+    : [];
 
 export function findDemoUser(email: string, password: string): DemoUser | undefined {
   return DEMO_USERS.find(

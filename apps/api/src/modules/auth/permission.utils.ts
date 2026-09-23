@@ -12,7 +12,7 @@ type RolePermissionRow = {
  * de-duplicated list, keeping the broadest scope when the same permission
  * key is granted by more than one role (e.g. GLOBAL beats BRANCH beats SELF).
  */
-const SCOPE_RANK = [
+export const SCOPE_RANK = [
   'SELF',
   'ASSIGNED',
   'CLASS',

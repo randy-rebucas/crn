@@ -4,6 +4,8 @@ import { EnrollmentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { certificateScopeWhere } from '../../common/authz/scope.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { IssueCertificateDto } from './dto/issue-certificate.dto.js';
 
 @Injectable()
@@ -14,9 +16,9 @@ export class CertificatesService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  findAllForOrganization(organizationId: string) {
+  findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.certificate.findMany({
-      where: { organizationId },
+      where: { organizationId: user.organizationId, ...certificateScopeWhere(user, 'certificates.view') },
       include: { program: { select: { name: true } } },
       orderBy: { issuedAt: 'desc' },
     });

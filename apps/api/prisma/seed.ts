@@ -1,5 +1,6 @@
 import { PrismaClient, PermissionScope } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -448,7 +449,15 @@ async function main() {
     await upsertRole(roleSeed.key, roleSeed.name, roleSeed.scope, roleSeed.permissionKeys);
   }
 
-  const passwordHash = await argon2.hash('ChangeMe123!');
+  // A hardcoded seed password (e.g. the previous 'ChangeMe123!') ends up
+  // committed to source control — if this script is ever run against a
+  // staging/production database and the password isn't rotated immediately,
+  // that's a documented, guessable GLOBAL-scope super-admin credential
+  // sitting in git history forever. Default to a fresh random password
+  // printed once; SEED_ADMIN_PASSWORD lets local dev pin a known value for
+  // repeatable logins without hardcoding one in the script itself.
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? randomBytes(12).toString('base64url');
+  const passwordHash = await argon2.hash(adminPassword);
 
   const superAdminUser = await prisma.user.upsert({
     where: { email: 'admin@obias.local' },
@@ -480,9 +489,12 @@ async function main() {
 
   console.log('Seeded organization:', org.slug);
   console.log('Seeded roles:', 3 + ROLE_CATALOG.length);
-  console.log('Seeded super admin:', superAdminUser.email, '(password: ChangeMe123!)');
-  console.log('Seeded branch manager:', northManagerUser.email, '(password: ChangeMe123!, branch: NORTH)');
+  console.log('Seeded super admin:', superAdminUser.email, `(password: ${adminPassword})`);
+  console.log('Seeded branch manager:', northManagerUser.email, `(password: ${adminPassword}, branch: NORTH)`);
   console.log('Seeded student role permission holder key:', studentRole.key);
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.log('⚠ This password was randomly generated and is only shown here — save it now.');
+  }
 }
 
 main()

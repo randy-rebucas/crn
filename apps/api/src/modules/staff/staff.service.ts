@@ -44,9 +44,19 @@ export class StaffService {
     return staff;
   }
 
+  // branchId is an opaque id from client input — without this check a
+  // caller could plant a StaffProfile pointing at another organization's
+  // branch (same bug class fixed elsewhere: users/students/instructors).
+  private async assertBranchBelongsToOrganization(organizationId: string, branchId?: string) {
+    if (!branchId) return;
+    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, organizationId } });
+    if (!branch) throw new NotFoundException('Branch not found in this organization');
+  }
+
   async create(organizationId: string, actorId: string, dto: CreateStaffDto) {
     const user = await this.prisma.user.findFirst({ where: { id: dto.userId, organizationId } });
     if (!user) throw new NotFoundException('User not found in this organization');
+    await this.assertBranchBelongsToOrganization(organizationId, dto.branchId);
 
     const staff = await this.prisma.staffProfile.create({
       data: {
@@ -74,6 +84,7 @@ export class StaffService {
 
   async update(user: AuthenticatedUser, id: string, dto: UpdateStaffDto) {
     const existing = await this.findOne(user, id);
+    await this.assertBranchBelongsToOrganization(user.organizationId, dto.branchId);
 
     const staff = await this.prisma.staffProfile.update({
       where: { id: existing.id },

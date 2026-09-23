@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { SCOPE_RANK } from '../auth/permission.utils.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateRoleDto } from './dto/create-role.dto.js';
 
 // Segregation of duties: these permission pairs each gate two distinct
@@ -20,6 +22,30 @@ function assertNoSodConflict(roleKey: string, permissionKeys: string[]) {
   }
 }
 
+// An actor may only grant a permission at a scope they hold themselves for
+// that same permission key — otherwise `roles.manage` alone would let anyone
+// mint a role with permissions/scopes broader than their own (e.g. a
+// mid-level admin fabricating a role with global `organizations.manage`),
+// then use `users.manage` to hand it to an account they control. This is not
+// itself the segregation-of-duties check above; it's the baseline "you can't
+// grant what you don't have" rule.
+function assertActorCanGrant(
+  actor: AuthenticatedUser,
+  requested: { permissionKey: string; scope: string }[],
+) {
+  const heldByKey = new Map(actor.permissions.map((p) => [p.key, p.scope]));
+  for (const grant of requested) {
+    const heldScope = heldByKey.get(grant.permissionKey);
+    const heldRank = heldScope ? SCOPE_RANK.indexOf(heldScope) : -1;
+    const requestedRank = SCOPE_RANK.indexOf(grant.scope);
+    if (heldRank < requestedRank) {
+      throw new ForbiddenException(
+        `Cannot grant "${grant.permissionKey}" at scope "${grant.scope}": you do not hold it at that scope or broader`,
+      );
+    }
+  }
+}
+
 @Injectable()
 export class RolesService {
   constructor(
@@ -34,11 +60,15 @@ export class RolesService {
     });
   }
 
-  async create(organizationId: string, actorId: string, dto: CreateRoleDto) {
+  async create(actor: AuthenticatedUser, dto: CreateRoleDto) {
+    const organizationId = actor.organizationId;
+    const actorId = actor.id;
+
     assertNoSodConflict(
       dto.key,
       dto.permissions.map((p) => p.permissionKey),
     );
+    assertActorCanGrant(actor, dto.permissions);
 
     const permissions = await this.prisma.permission.findMany({
       where: { key: { in: dto.permissions.map((p) => p.permissionKey) } },

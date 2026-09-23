@@ -15,7 +15,7 @@ export class InstructorsController {
   @Get()
   @RequirePermissions('instructors.view')
   findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.instructors.findAllForOrganization(user.organizationId);
+    return this.instructors.findAllForOrganization(user);
   }
 
   @Post()

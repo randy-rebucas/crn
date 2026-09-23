@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
@@ -76,10 +76,37 @@ const NAV_GROUPS: AdminNavGroup[] = [
   },
 ];
 
+// Flattened once from NAV_GROUPS — the single source of truth for which
+// permission unlocks which route, already used to decide what's visible in
+// the sidebar. Reused here as a page-level access gate: the sidebar hiding
+// a link doesn't stop someone from typing the URL directly, and the backend
+// enforcing the same permission per-request is not itself a reason to skip
+// this — a page-level redirect avoids ever mounting a restricted page's
+// components (and firing their queries) client-side in the first place.
+const PERMISSION_BY_PATH: { href: string; permission?: string }[] = NAV_GROUPS.flatMap((group) => group.items);
+
+function requiredPermissionFor(pathname: string): string | undefined {
+  // Longest-prefix match so nested routes (e.g. /students/:id) inherit
+  // their section's permission (/students).
+  const match = PERMISSION_BY_PATH.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+  return match?.permission;
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, hasPermission } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const requiredPermission = requiredPermissionFor(pathname);
+  const isAllowed = !requiredPermission || hasPermission(requiredPermission);
+
+  useEffect(() => {
+    if (!isLoading && user && !isAllowed) {
+      router.replace('/dashboard');
+    }
+  }, [isLoading, user, isAllowed, router]);
 
   const notificationsQuery = useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -102,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     })).filter((group) => group.items.length > 0);
   }, [user, hasPermission]);
 
-  if (isLoading || !user) {
+  if (isLoading || !user || !isAllowed) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>;
   }
 

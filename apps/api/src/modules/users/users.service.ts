@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -27,7 +27,28 @@ export class UsersService {
     return this.prisma.user.findMany({ where: { organizationId }, select: SAFE_SELECT });
   }
 
+  // roleIds/branchIds are opaque ids from client input — without this check
+  // an actor could attach a role or branch belonging to a different
+  // organization (its permissions/scope would then leak into this org via
+  // that role's grants, or its branch-scoped data via UserBranch).
+  private async assertBelongsToOrganization(organizationId: string, roleIds: string[], branchIds: string[]) {
+    if (roleIds.length > 0) {
+      const found = await this.prisma.role.count({ where: { id: { in: roleIds }, organizationId } });
+      if (found !== new Set(roleIds).size) {
+        throw new BadRequestException('One or more roleIds do not belong to this organization');
+      }
+    }
+    if (branchIds.length > 0) {
+      const found = await this.prisma.branch.count({ where: { id: { in: branchIds }, organizationId } });
+      if (found !== new Set(branchIds).size) {
+        throw new BadRequestException('One or more branchIds do not belong to this organization');
+      }
+    }
+  }
+
   async create(organizationId: string, actorId: string, dto: CreateUserDto) {
+    await this.assertBelongsToOrganization(organizationId, dto.roleIds ?? [], dto.branchIds ?? []);
+
     const passwordHash = await argon2.hash(dto.password);
 
     const user = await this.prisma.user.create({

@@ -58,6 +58,11 @@ export class ClassesService {
   }
 
   async create(organizationId: string, actorId: string, dto: CreateClassDto) {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: dto.branchId, organizationId },
+    });
+    if (!branch) throw new NotFoundException('Branch not found');
+
     const batch = await this.prisma.batch.findFirst({
       where: { id: dto.batchId, branch: { organizationId } },
     });

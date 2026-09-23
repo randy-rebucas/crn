@@ -22,7 +22,7 @@ export class CertificatesController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('certificates.view')
   findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.certificates.findAllForOrganization(user.organizationId);
+    return this.certificates.findAllForOrganization(user);
   }
 
   @Post()

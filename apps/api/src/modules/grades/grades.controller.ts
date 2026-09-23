@@ -20,6 +20,6 @@ export class GradesController {
   @Get('exams/:examId')
   @RequirePermissions('exams.grade')
   findForExam(@CurrentUser() user: AuthenticatedUser, @Param('examId') examId: string) {
-    return this.grades.forExam(user.organizationId, examId);
+    return this.grades.forExam(user, examId);
   }
 }

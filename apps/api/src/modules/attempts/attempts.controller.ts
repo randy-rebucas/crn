@@ -17,7 +17,7 @@ export class AttemptsController {
   @Get()
   @RequirePermissions('exams.grade')
   findAllForExam(@CurrentUser() user: AuthenticatedUser, @Query('examId') examId: string) {
-    return this.attempts.findAllForExam(user.organizationId, examId);
+    return this.attempts.findAllForExam(user, examId);
   }
 
   // Must be registered before `:id` below, or Nest would try to treat
@@ -58,6 +58,6 @@ export class AttemptsController {
     @Param('questionId') questionId: string,
     @Body() dto: GradeAnswerDto,
   ) {
-    return this.attempts.gradeAnswer(user.organizationId, user.id, id, questionId, dto.pointsAwarded);
+    return this.attempts.gradeAnswer(user, id, questionId, dto.pointsAwarded);
   }
 }

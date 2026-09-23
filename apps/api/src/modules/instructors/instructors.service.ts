@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { branchScopeWhere } from '../../common/authz/scope.js';
+import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateInstructorDto } from './dto/create-instructor.dto.js';
 
 const PROFILE_SELECT = {
@@ -19,9 +21,9 @@ export class InstructorsService {
     private readonly audit: AuditService,
   ) {}
 
-  findAllForOrganization(organizationId: string) {
+  findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.instructorProfile.findMany({
-      where: { organizationId },
+      where: { organizationId: user.organizationId, ...branchScopeWhere(user, 'instructors.view') },
       select: PROFILE_SELECT,
       orderBy: { createdAt: 'desc' },
     });
@@ -32,6 +34,11 @@ export class InstructorsService {
       where: { id: dto.userId, organizationId },
     });
     if (!user) throw new NotFoundException('User not found in this organization');
+
+    if (dto.branchId) {
+      const branch = await this.prisma.branch.findFirst({ where: { id: dto.branchId, organizationId } });
+      if (!branch) throw new BadRequestException('branchId does not belong to this organization');
+    }
 
     const profile = await this.prisma.instructorProfile.create({
       data: {

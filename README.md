@@ -48,6 +48,11 @@ Start local infrastructure (Postgres and Redis):
 npm run db:up
 ```
 
+This reads `POSTGRES_PASSWORD`/`REDIS_PASSWORD` from a gitignored `.env` file at the repo
+root (already present for local dev — `docker-compose.yml` intentionally has no hardcoded
+default, since a committed datastore password is a live credential the moment the compose
+file is ever used somewhere network-reachable). Both ports are bound to `127.0.0.1` only.
+
 Set up the database (from `apps/api`, first time only):
 
 ```bash
