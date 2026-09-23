@@ -99,33 +99,33 @@ npm run db:down
 
 Sign-in always goes through the real API (`apps/api` must be running). After `npm run prisma:seed`
 (from `apps/api`), one account per system role exists in the database,
-all sharing the same password (`ChangeMe123!` if you set `SEED_ADMIN_PASSWORD=ChangeMe123!` before
+all sharing the same password (`DevPass123!` if you set `SEED_ADMIN_PASSWORD=DevPass123!` before
 seeding — otherwise a random password is generated and printed once):
 
 | Role | Email | Password | Scope |
 | --- | --- | --- | --- |
-| Super Admin | `admin@obias.local` | `ChangeMe123!` | Global — every permission, both branches |
-| Branch Manager | `north.manager@obias.local` | `ChangeMe123!` | Branch-scoped to the seeded "North Branch" (proves scoped RBAC actually narrows queries, not just resolves permissions) |
-| Student | `student@obias.local` | `ChangeMe123!` | Self-scoped |
-| Owner / Executive | `owner_executive@obias.local` | `ChangeMe123!` | Organization |
-| Operations Manager | `operations_manager@obias.local` | `ChangeMe123!` | Organization |
-| Academic Director | `academic_director@obias.local` | `ChangeMe123!` | Organization |
-| Lead Instructor | `lead_instructor@obias.local` | `ChangeMe123!` | Branch |
-| Instructor | `instructor@obias.local` | `ChangeMe123!` | Assigned |
-| Content Manager | `content_manager@obias.local` | `ChangeMe123!` | Organization |
-| Exam Administrator | `exam_administrator@obias.local` | `ChangeMe123!` | Organization |
-| Registrar | `registrar@obias.local` | `ChangeMe123!` | Branch |
-| Admissions Officer | `admissions_officer@obias.local` | `ChangeMe123!` | Branch |
-| Front Desk Staff | `front_desk_staff@obias.local` | `ChangeMe123!` | Branch |
-| General Staff | `general_staff@obias.local` | `ChangeMe123!` | Branch |
-| Finance Manager | `finance_manager@obias.local` | `ChangeMe123!` | Branch |
-| Finance Officer | `finance_officer@obias.local` | `ChangeMe123!` | Branch |
-| Cashier | `cashier@obias.local` | `ChangeMe123!` | Branch |
-| HR Manager | `hr_manager@obias.local` | `ChangeMe123!` | Organization |
-| HR Staff | `hr_staff@obias.local` | `ChangeMe123!` | Organization |
-| Auditor | `auditor@obias.local` | `ChangeMe123!` | Organization (read-only) |
+| Super Admin | `admin@obias.local` | `DevPass123!` | Global — every permission, both branches |
+| Branch Manager | `north.manager@obias.local` | `DevPass123!` | Branch-scoped to the seeded "North Branch" (proves scoped RBAC actually narrows queries, not just resolves permissions) |
+| Student | `student@obias.local` | `DevPass123!` | Self-scoped |
+| Owner / Executive | `owner_executive@obias.local` | `DevPass123!` | Organization |
+| Operations Manager | `operations_manager@obias.local` | `DevPass123!` | Organization |
+| Academic Director | `academic_director@obias.local` | `DevPass123!` | Organization |
+| Lead Instructor | `lead_instructor@obias.local` | `DevPass123!` | Branch |
+| Instructor | `instructor@obias.local` | `DevPass123!` | Assigned |
+| Content Manager | `content_manager@obias.local` | `DevPass123!` | Organization |
+| Exam Administrator | `exam_administrator@obias.local` | `DevPass123!` | Organization |
+| Registrar | `registrar@obias.local` | `DevPass123!` | Branch |
+| Admissions Officer | `admissions_officer@obias.local` | `DevPass123!` | Branch |
+| Front Desk Staff | `front_desk_staff@obias.local` | `DevPass123!` | Branch |
+| General Staff | `general_staff@obias.local` | `DevPass123!` | Branch |
+| Finance Manager | `finance_manager@obias.local` | `DevPass123!` | Branch |
+| Finance Officer | `finance_officer@obias.local` | `DevPass123!` | Branch |
+| Cashier | `cashier@obias.local` | `DevPass123!` | Branch |
+| HR Manager | `hr_manager@obias.local` | `DevPass123!` | Organization |
+| HR Staff | `hr_staff@obias.local` | `DevPass123!` | Organization |
+| Auditor | `auditor@obias.local` | `DevPass123!` | Organization (read-only) |
 
-`ChangeMe123!` only applies if you seed with `SEED_ADMIN_PASSWORD=ChangeMe123!` (see above) — without
+`DevPass123!` only applies if you seed with `SEED_ADMIN_PASSWORD=DevPass123!` (see above) — without
 it, every account shares one randomly generated password printed once at seed time.
 
 The seed is idempotent and additive: re-running it after adding a new permission key backfills

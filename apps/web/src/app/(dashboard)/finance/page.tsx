@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -163,35 +164,32 @@ function PricingSection() {
         )}
       </div>
 
-      {showForm && (
-        <Card className="mb-6 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">Set program price</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-4">
-            <Field label="Program" error={errors.programId?.message}>
-              <Select {...register('programId')} defaultValue={selectedProgramId}>
-                <option value="">Select…</option>
-                {programs?.map((program) => (
-                  <option key={program.id} value={program.id}>
-                    {program.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Amount (centavos)" error={errors.amount?.message}>
-              <Input type="number" placeholder="e.g. 1500000 = PHP 15,000.00" {...register('amount')} />
-            </Field>
-            <Field label="Currency">
-              <Input placeholder="PHP" {...register('currency')} />
-            </Field>
-            <div className="flex items-end">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : 'Save price'}
-              </Button>
-            </div>
-            {serverError && <p className="text-sm text-red-600 sm:col-span-4">{serverError}</p>}
-          </form>
-        </Card>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="Set program price">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <Field label="Program" error={errors.programId?.message}>
+            <Select {...register('programId')} defaultValue={selectedProgramId}>
+              <option value="">Select…</option>
+              {programs?.map((program) => (
+                <option key={program.id} value={program.id}>
+                  {program.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Amount (centavos)" error={errors.amount?.message}>
+            <Input type="number" placeholder="e.g. 1500000 = PHP 15,000.00" {...register('amount')} />
+          </Field>
+          <Field label="Currency">
+            <Input placeholder="PHP" {...register('currency')} />
+          </Field>
+          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving…' : 'Save price'}
+            </Button>
+          </div>
+        </form>
+      </Drawer>
 
       {!selectedProgramId && (
         <EmptyState title="Choose a program" description="Select a program above to view its pricing history." />
@@ -291,35 +289,32 @@ function InvoicesSection() {
         )}
       </div>
 
-      {showForm && (
-        <Card className="mb-6 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">New invoice</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-4">
-            <Field label="Enrollment" error={errors.enrollmentId?.message}>
-              <Select {...register('enrollmentId')}>
-                <option value="">Select…</option>
-                {enrollments?.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.student.user.firstName} {e.student.user.lastName} — {e.program.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Discount (centavos)" error={errors.discountAmount?.message}>
-              <Input type="number" placeholder="Optional" {...register('discountAmount')} />
-            </Field>
-            <Field label="Due date">
-              <Input type="date" {...register('dueDate')} />
-            </Field>
-            <div className="flex items-end">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating…' : 'Create invoice'}
-              </Button>
-            </div>
-            {serverError && <p className="text-sm text-red-600 sm:col-span-4">{serverError}</p>}
-          </form>
-        </Card>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New invoice">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <Field label="Enrollment" error={errors.enrollmentId?.message}>
+            <Select {...register('enrollmentId')}>
+              <option value="">Select…</option>
+              {enrollments?.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.student.user.firstName} {e.student.user.lastName} — {e.program.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Discount (centavos)" error={errors.discountAmount?.message}>
+            <Input type="number" placeholder="Optional" {...register('discountAmount')} />
+          </Field>
+          <Field label="Due date">
+            <Input type="date" {...register('dueDate')} />
+          </Field>
+          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating…' : 'Create invoice'}
+            </Button>
+          </div>
+        </form>
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load invoices." />}
@@ -347,8 +342,8 @@ function InvoicesSection() {
                 const outstanding = Math.max(invoice.totalAmount - paid, 0);
                 const expanded = expandedId === invoice.id;
                 return (
-                  <>
-                    <tr key={invoice.id}>
+                  <Fragment key={invoice.id}>
+                    <tr>
                       <td className="px-4 py-3 font-mono text-xs text-slate-600">{invoice.id.slice(0, 8)}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{formatMoney(invoice.totalAmount)}</td>
                       <td className="px-4 py-3 text-slate-600">{formatMoney(outstanding)}</td>
@@ -389,7 +384,7 @@ function InvoicesSection() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -482,41 +477,38 @@ function PaymentsSection() {
         )}
       </div>
 
-      {showForm && (
-        <Card className="mb-6 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">Record payment</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-4">
-            <Field label="Invoice" error={errors.invoiceId?.message}>
-              <Select {...register('invoiceId')} defaultValue={invoiceFilter}>
-                <option value="">Select…</option>
-                {invoices?.map((inv) => (
-                  <option key={inv.id} value={inv.id}>
-                    {inv.id.slice(0, 8)} — {formatMoney(inv.totalAmount)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Amount (centavos)" error={errors.amount?.message}>
-              <Input type="number" {...register('amount')} />
-            </Field>
-            <Field label="Method" error={errors.method?.message}>
-              <Select {...register('method')}>
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {m.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div className="flex items-end">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : 'Record payment'}
-              </Button>
-            </div>
-            {serverError && <p className="text-sm text-red-600 sm:col-span-4">{serverError}</p>}
-          </form>
-        </Card>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="Record payment">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <Field label="Invoice" error={errors.invoiceId?.message}>
+            <Select {...register('invoiceId')} defaultValue={invoiceFilter}>
+              <option value="">Select…</option>
+              {invoices?.map((inv) => (
+                <option key={inv.id} value={inv.id}>
+                  {inv.id.slice(0, 8)} — {formatMoney(inv.totalAmount)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Amount (centavos)" error={errors.amount?.message}>
+            <Input type="number" {...register('amount')} />
+          </Field>
+          <Field label="Method" error={errors.method?.message}>
+            <Select {...register('method')}>
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving…' : 'Record payment'}
+            </Button>
+          </div>
+        </form>
+      </Drawer>
 
       {!invoiceFilter && (
         <EmptyState title="Choose an invoice" description="Select an invoice above to view its payments." />
@@ -656,40 +648,37 @@ function RefundsSection() {
         )}
       </div>
 
-      {showForm && (
-        <Card className="mb-6 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">Request refund</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-4">
-            <Field label="Verified payment" error={errors.paymentId?.message}>
-              <Select {...register('paymentId')} defaultValue="">
-                <option value="" disabled>
-                  Select a payment…
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="Request refund">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <Field label="Verified payment" error={errors.paymentId?.message}>
+            <Select {...register('paymentId')} defaultValue="">
+              <option value="" disabled>
+                Select a payment…
+              </option>
+              {verifiedPayments?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.invoice
+                    ? `${p.invoice.enrollment.student.user.firstName} ${p.invoice.enrollment.student.user.lastName} — `
+                    : ''}
+                  {formatMoney(p.amount)} ({p.method}) · {p.id.slice(0, 8)}
                 </option>
-                {verifiedPayments?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.invoice
-                      ? `${p.invoice.enrollment.student.user.firstName} ${p.invoice.enrollment.student.user.lastName} — `
-                      : ''}
-                    {formatMoney(p.amount)} ({p.method}) · {p.id.slice(0, 8)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Amount (centavos)" error={errors.amount?.message}>
-              <Input type="number" {...register('amount')} />
-            </Field>
-            <Field label="Reason" error={errors.reason?.message}>
-              <Input {...register('reason')} />
-            </Field>
-            <div className="flex items-end">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Requesting…' : 'Request refund'}
-              </Button>
-            </div>
-            {serverError && <p className="text-sm text-red-600 sm:col-span-4">{serverError}</p>}
-          </form>
-        </Card>
-      )}
+              ))}
+            </Select>
+          </Field>
+          <Field label="Amount (centavos)" error={errors.amount?.message}>
+            <Input type="number" {...register('amount')} />
+          </Field>
+          <Field label="Reason" error={errors.reason?.message}>
+            <Input {...register('reason')} />
+          </Field>
+          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Requesting…' : 'Request refund'}
+            </Button>
+          </div>
+        </form>
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load refunds." />}

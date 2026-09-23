@@ -31,4 +31,9 @@ export class ReportsController {
   examPerformance(@CurrentUser() user: AuthenticatedUser) {
     return this.reports.examPerformance(user.organizationId);
   }
+
+  @Get('attempts-trend')
+  attemptsTrend(@CurrentUser() user: AuthenticatedUser) {
+    return this.reports.attemptsTrend(user.organizationId);
+  }
 }

@@ -8,7 +8,17 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
-import { Button, Card, EmptyState, ErrorState, Field, Input, LoadingState, PageHeader } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Drawer,
+  EmptyState,
+  ErrorState,
+  Field,
+  Input,
+  LoadingState,
+  PageHeader,
+} from '@/components/ui';
 
 interface Branch {
   id: string;
@@ -54,26 +64,23 @@ function CreateBranchForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New branch</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-3">
-        <Field label="Name" error={errors.name?.message}>
-          <Input {...register('name')} placeholder="Main Branch" />
-        </Field>
-        <Field label="Code" error={errors.code?.message}>
-          <Input {...register('code')} placeholder="MAIN" />
-        </Field>
-        <Field label="Address">
-          <Input {...register('address')} placeholder="Optional" />
-        </Field>
-        <div className="flex items-end sm:col-span-3">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create branch'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 sm:col-span-3">{serverError}</p>}
-      </form>
-    </Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Name" error={errors.name?.message}>
+        <Input {...register('name')} placeholder="Main Branch" />
+      </Field>
+      <Field label="Code" error={errors.code?.message}>
+        <Input {...register('code')} placeholder="MAIN" />
+      </Field>
+      <Field label="Address">
+        <Input {...register('address')} placeholder="Optional" />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create branch'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -99,16 +106,14 @@ export default function BranchesPage() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateBranchForm
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['branches'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New branch">
+        <CreateBranchForm
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['branches'] });
+          }}
+        />
+      </Drawer>
 
       {branchesQuery.isLoading && <LoadingState />}
       {branchesQuery.isError && <ErrorState message="Could not load branches." />}

@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -69,25 +70,22 @@ function CreateProgramForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New program</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-3">
-        <Field label="Name" error={errors.name?.message}>
-          <Input placeholder="Nursing Review" {...register('name')} />
-        </Field>
-        <Field label="Slug" error={errors.slug?.message}>
-          <Input placeholder="nursing-review" {...register('slug')} />
-        </Field>
-        <Field label="Description">
-          <Input placeholder="Optional" {...register('description')} />
-        </Field>
-        <div className="sm:col-span-3">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create program'}
-          </Button>
-        </div>
-      </form>
-    </Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Name" error={errors.name?.message}>
+        <Input placeholder="Nursing Review" {...register('name')} />
+      </Field>
+      <Field label="Slug" error={errors.slug?.message}>
+        <Input placeholder="nursing-review" {...register('slug')} />
+      </Field>
+      <Field label="Description">
+        <Input placeholder="Optional" {...register('description')} />
+      </Field>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create program'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -114,16 +112,14 @@ export default function ProgramsPage() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateProgramForm
-            onCreated={() => {
-              setShowForm(false);
-              refetch();
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New program">
+        <CreateProgramForm
+          onCreated={() => {
+            setShowForm(false);
+            refetch();
+          }}
+        />
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load programs." />}

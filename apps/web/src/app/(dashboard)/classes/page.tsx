@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -120,76 +121,73 @@ function CreateClassForm({
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New class</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Batch" error={errors.batchId?.message}>
-          <Select {...register('batchId')} defaultValue="">
-            <option value="" disabled>
-              Select batch…
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Batch" error={errors.batchId?.message}>
+        <Select {...register('batchId')} defaultValue="">
+          <option value="" disabled>
+            Select batch…
+          </option>
+          {batches.map((batch) => (
+            <option key={batch.id} value={batch.id}>
+              {batch.name} ({batch.program.name})
             </option>
-            {batches.map((batch) => (
-              <option key={batch.id} value={batch.id}>
-                {batch.name} ({batch.program.name})
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Course" error={errors.courseId?.message}>
-          <Select {...register('courseId')} defaultValue="" disabled={!selectedBatchId}>
-            <option value="" disabled>
-              {selectedBatchId ? 'Select course…' : 'Select a batch first'}
+          ))}
+        </Select>
+      </Field>
+      <Field label="Course" error={errors.courseId?.message}>
+        <Select {...register('courseId')} defaultValue="" disabled={!selectedBatchId}>
+          <option value="" disabled>
+            {selectedBatchId ? 'Select course…' : 'Select a batch first'}
+          </option>
+          {(courses ?? []).map((course) => (
+            <option key={course.id} value={course.id}>
+              {course.name} ({course.code})
             </option>
-            {(courses ?? []).map((course) => (
-              <option key={course.id} value={course.id}>
-                {course.name} ({course.code})
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Branch" error={errors.branchId?.message}>
-          <Select {...register('branchId')} defaultValue="">
-            <option value="" disabled>
-              Select branch…
+          ))}
+        </Select>
+      </Field>
+      <Field label="Branch" error={errors.branchId?.message}>
+        <Select {...register('branchId')} defaultValue="">
+          <option value="" disabled>
+            Select branch…
+          </option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.name}
             </option>
-            {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Class name" error={errors.name?.message}>
-          <Input placeholder="Section A" {...register('name')} />
-        </Field>
-        <Field label="Instructor">
-          <Select {...register('instructorProfileId')} defaultValue="">
-            <option value="">Unassigned</option>
-            {instructors.map((instructor) => (
-              <option key={instructor.id} value={instructor.id}>
-                {instructor.user.firstName} {instructor.user.lastName}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Room">
-          <Select {...register('roomId')} defaultValue="">
-            <option value="">Unassigned</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div className="flex items-end lg:col-span-4">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create class'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 lg:col-span-4">{serverError}</p>}
-      </form>
-    </Card>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Class name" error={errors.name?.message}>
+        <Input placeholder="Section A" {...register('name')} />
+      </Field>
+      <Field label="Instructor">
+        <Select {...register('instructorProfileId')} defaultValue="">
+          <option value="">Unassigned</option>
+          {instructors.map((instructor) => (
+            <option key={instructor.id} value={instructor.id}>
+              {instructor.user.firstName} {instructor.user.lastName}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Room">
+        <Select {...register('roomId')} defaultValue="">
+          <option value="">Unassigned</option>
+          {rooms.map((room) => (
+            <option key={room.id} value={room.id}>
+              {room.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create class'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -226,35 +224,32 @@ function CreateRoomForm({ branches, onCreated }: { branches: Branch[]; onCreated
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New room</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-3">
-        <Field label="Branch" error={errors.branchId?.message}>
-          <Select {...register('branchId')} defaultValue="">
-            <option value="" disabled>
-              Select branch…
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Branch" error={errors.branchId?.message}>
+        <Select {...register('branchId')} defaultValue="">
+          <option value="" disabled>
+            Select branch…
+          </option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.name}
             </option>
-            {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Name" error={errors.name?.message}>
-          <Input placeholder="Room 101" {...register('name')} />
-        </Field>
-        <Field label="Capacity">
-          <Input type="number" min={1} placeholder="Optional" {...register('capacity')} />
-        </Field>
-        <div className="sm:col-span-3">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create room'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 sm:col-span-3">{serverError}</p>}
-      </form>
-    </Card>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Name" error={errors.name?.message}>
+        <Input placeholder="Room 101" {...register('name')} />
+      </Field>
+      <Field label="Capacity">
+        <Input type="number" min={1} placeholder="Optional" {...register('capacity')} />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create room'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -296,20 +291,18 @@ function ClassesTab() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateClassForm
-            batches={batches ?? []}
-            branches={branches ?? []}
-            rooms={rooms ?? []}
-            instructors={instructors ?? []}
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['classes'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New class">
+        <CreateClassForm
+          batches={batches ?? []}
+          branches={branches ?? []}
+          rooms={rooms ?? []}
+          instructors={instructors ?? []}
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+          }}
+        />
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load classes." />}
@@ -378,17 +371,15 @@ function RoomsTab() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateRoomForm
-            branches={branches ?? []}
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['rooms'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New room">
+        <CreateRoomForm
+          branches={branches ?? []}
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['rooms'] });
+          }}
+        />
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load rooms." />}

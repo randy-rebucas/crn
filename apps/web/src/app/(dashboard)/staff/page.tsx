@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -92,46 +93,43 @@ function CreateStaffForm({
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New staff member</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="User" error={errors.userId?.message}>
-          <Select {...register('userId')}>
-            <option value="">Select a user…</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.firstName} {u.lastName} ({u.email})
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Position" error={errors.position?.message}>
-          <Input {...register('position')} placeholder="Registrar" />
-        </Field>
-        <Field label="Department">
-          <Input {...register('department')} placeholder="Optional" />
-        </Field>
-        <Field label="Branch">
-          <Select {...register('branchId')}>
-            <option value="">Unassigned</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Hire date">
-          <Input type="date" {...register('hireDate')} />
-        </Field>
-        <div className="flex items-end lg:col-span-5">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Add staff member'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 lg:col-span-5">{serverError}</p>}
-      </form>
-    </Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="User" error={errors.userId?.message}>
+        <Select {...register('userId')}>
+          <option value="">Select a user…</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.firstName} {u.lastName} ({u.email})
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Position" error={errors.position?.message}>
+        <Input {...register('position')} placeholder="Registrar" />
+      </Field>
+      <Field label="Department">
+        <Input {...register('department')} placeholder="Optional" />
+      </Field>
+      <Field label="Branch">
+        <Select {...register('branchId')}>
+          <option value="">Unassigned</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Hire date">
+        <Input type="date" {...register('hireDate')} />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Add staff member'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -171,24 +169,22 @@ export default function StaffPage() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          {loadingLookups && <LoadingState />}
-          {!loadingLookups && (branchesQuery.isError || usersQuery.isError) && (
-            <ErrorState message="Could not load users or branches." />
-          )}
-          {!loadingLookups && !branchesQuery.isError && !usersQuery.isError && (
-            <CreateStaffForm
-              users={usersQuery.data ?? []}
-              branches={branchesQuery.data ?? []}
-              onCreated={() => {
-                setShowForm(false);
-                queryClient.invalidateQueries({ queryKey: ['staff'] });
-              }}
-            />
-          )}
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New staff member">
+        {loadingLookups && <LoadingState />}
+        {!loadingLookups && (branchesQuery.isError || usersQuery.isError) && (
+          <ErrorState message="Could not load users or branches." />
+        )}
+        {!loadingLookups && !branchesQuery.isError && !usersQuery.isError && (
+          <CreateStaffForm
+            users={usersQuery.data ?? []}
+            branches={branchesQuery.data ?? []}
+            onCreated={() => {
+              setShowForm(false);
+              queryClient.invalidateQueries({ queryKey: ['staff'] });
+            }}
+          />
+        )}
+      </Drawer>
 
       {staffQuery.isLoading && <LoadingState />}
       {staffQuery.isError && <ErrorState message="Could not load staff." />}

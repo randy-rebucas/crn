@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -130,9 +131,13 @@ export { icons as adminIcons };
 function Brand() {
   return (
     <div className="flex items-center gap-2.5 border-b border-slate-200 px-5 py-5">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-700 text-sm font-bold text-white">
-        O
-      </div>
+      <Image
+        src="/obias_crn_logo_transparent.png"
+        alt="OBIAS Nursing & Allied Courses Review Center"
+        width={36}
+        height={36}
+        className="h-9 w-9 shrink-0 object-contain"
+      />
       <div className="min-w-0 leading-tight">
         <div className="truncate text-sm font-extrabold tracking-tight text-red-700">OBIAS Admin</div>
         <div className="truncate text-[9px] font-medium uppercase tracking-wide text-slate-400">
@@ -221,9 +226,17 @@ export function AdminSidebar({ groups }: { groups: AdminNavGroup[] }) {
   };
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+    <aside className="hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <Brand />
       <SidebarNav groups={groups} />
+      <div className="px-3 pb-3">
+        <div className="rounded-xl bg-amber-50 p-4 text-center">
+          <p className="text-xs font-semibold text-slate-800">Same Passion. A Healthier Tomorrow.</p>
+          <p className="mt-1 text-[11px] leading-snug text-slate-500">
+            Empowering more healthcare professionals through quality review education.
+          </p>
+        </div>
+      </div>
       <div className="border-t border-slate-200 p-3">
         <button
           onClick={handleLogout}

@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -85,47 +86,44 @@ function CreateScheduleForm({
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New schedule</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Class" error={errors.classId?.message}>
-          <Select {...register('classId')} defaultValue={defaultClassId ?? ''}>
-            <option value="" disabled>
-              Select class…
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Class" error={errors.classId?.message}>
+        <Select {...register('classId')} defaultValue={defaultClassId ?? ''}>
+          <option value="" disabled>
+            Select class…
+          </option>
+          {classes.map((cls) => (
+            <option key={cls.id} value={cls.id}>
+              {cls.name} — {cls.course.name} ({cls.batch.name})
             </option>
-            {classes.map((cls) => (
-              <option key={cls.id} value={cls.id}>
-                {cls.name} — {cls.course.name} ({cls.batch.name})
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Day of week" error={errors.dayOfWeek?.message}>
-          <Select {...register('dayOfWeek')} defaultValue="">
-            <option value="" disabled>
-              Select day…
+          ))}
+        </Select>
+      </Field>
+      <Field label="Day of week" error={errors.dayOfWeek?.message}>
+        <Select {...register('dayOfWeek')} defaultValue="">
+          <option value="" disabled>
+            Select day…
+          </option>
+          {DAY_LABELS.map((label, index) => (
+            <option key={label} value={index}>
+              {label}
             </option>
-            {DAY_LABELS.map((label, index) => (
-              <option key={label} value={index}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Start time" error={errors.startTime?.message}>
-          <Input type="time" {...register('startTime')} />
-        </Field>
-        <Field label="End time" error={errors.endTime?.message}>
-          <Input type="time" {...register('endTime')} />
-        </Field>
-        <div className="flex items-end lg:col-span-4">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create schedule'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 lg:col-span-4">{serverError}</p>}
-      </form>
-    </Card>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Start time" error={errors.startTime?.message}>
+        <Input type="time" {...register('startTime')} />
+      </Field>
+      <Field label="End time" error={errors.endTime?.message}>
+        <Input type="time" {...register('endTime')} />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create schedule'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -172,18 +170,16 @@ export default function SchedulesPage() {
         </Field>
       </div>
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateScheduleForm
-            classes={classes ?? []}
-            defaultClassId={effectiveClassId}
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['schedules'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New schedule">
+        <CreateScheduleForm
+          classes={classes ?? []}
+          defaultClassId={effectiveClassId}
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['schedules'] });
+          }}
+        />
+      </Drawer>
 
       {!effectiveClassId && !classesLoading && (
         <EmptyState title="No classes yet" description="Create a class before scheduling meeting times." />

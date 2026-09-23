@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -130,26 +131,26 @@ function AnnouncementsTab({ canManage }: { canManage: boolean }) {
           <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New Announcement'}</Button>
         </div>
       )}
-      {showForm && (
-        <Card className="mb-4 p-5">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-            <Field label="Title" error={errors.title?.message}>
-              <Input {...register('title')} />
-            </Field>
-            <Field label="Body" error={errors.body?.message}>
-              <textarea
-                {...register('body')}
-                rows={3}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-              />
-            </Field>
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New Announcement">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <Field label="Title" error={errors.title?.message}>
+            <Input {...register('title')} />
+          </Field>
+          <Field label="Body" error={errors.body?.message}>
+            <textarea
+              {...register('body')}
+              rows={3}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
+            />
+          </Field>
+          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Creating…' : 'Create announcement'}
             </Button>
-            {serverError && <p className="text-sm text-red-600">{serverError}</p>}
-          </form>
-        </Card>
-      )}
+          </div>
+        </form>
+      </Drawer>
 
       {query.isLoading && <LoadingState />}
       {query.isError && <ErrorState message="Could not load announcements." />}
@@ -245,34 +246,32 @@ function SuccessStoriesTab({ canManage }: { canManage: boolean }) {
           <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New Success Story'}</Button>
         </div>
       )}
-      {showForm && (
-        <Card className="mb-4 p-5">
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-3 sm:grid-cols-2">
-            <Field label="Graduate name" error={errors.graduateName?.message}>
-              <Input {...register('graduateName')} />
-            </Field>
-            <Field label="Program" error={errors.programName?.message}>
-              <Input {...register('programName')} />
-            </Field>
-            <Field label="Year">
-              <Input type="number" {...register('year')} />
-            </Field>
-            <Field label="Testimonial" error={errors.testimonial?.message}>
-              <textarea
-                {...register('testimonial')}
-                rows={3}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none sm:col-span-2"
-              />
-            </Field>
-            <div className="sm:col-span-2">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating…' : 'Create success story'}
-              </Button>
-            </div>
-            {serverError && <p className="text-sm text-red-600 sm:col-span-2">{serverError}</p>}
-          </form>
-        </Card>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New Success Story">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <Field label="Graduate name" error={errors.graduateName?.message}>
+            <Input {...register('graduateName')} />
+          </Field>
+          <Field label="Program" error={errors.programName?.message}>
+            <Input {...register('programName')} />
+          </Field>
+          <Field label="Year">
+            <Input type="number" {...register('year')} />
+          </Field>
+          <Field label="Testimonial" error={errors.testimonial?.message}>
+            <textarea
+              {...register('testimonial')}
+              rows={3}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
+            />
+          </Field>
+          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating…' : 'Create success story'}
+            </Button>
+          </div>
+        </form>
+      </Drawer>
 
       {query.isLoading && <LoadingState />}
       {query.isError && <ErrorState message="Could not load success stories." />}
@@ -360,26 +359,26 @@ function FaqTab({ canManage }: { canManage: boolean }) {
           <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New FAQ Item'}</Button>
         </div>
       )}
-      {showForm && (
-        <Card className="mb-4 p-5">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-            <Field label="Question" error={errors.question?.message}>
-              <Input {...register('question')} />
-            </Field>
-            <Field label="Answer" error={errors.answer?.message}>
-              <textarea
-                {...register('answer')}
-                rows={3}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-              />
-            </Field>
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New FAQ Item">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <Field label="Question" error={errors.question?.message}>
+            <Input {...register('question')} />
+          </Field>
+          <Field label="Answer" error={errors.answer?.message}>
+            <textarea
+              {...register('answer')}
+              rows={3}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
+            />
+          </Field>
+          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Creating…' : 'Create FAQ item'}
             </Button>
-            {serverError && <p className="text-sm text-red-600">{serverError}</p>}
-          </form>
-        </Card>
-      )}
+          </div>
+        </form>
+      </Drawer>
 
       {query.isLoading && <LoadingState />}
       {query.isError && <ErrorState message="Could not load FAQ items." />}

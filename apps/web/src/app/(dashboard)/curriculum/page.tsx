@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -170,8 +171,8 @@ function MaterialsPanel({ lessonId, canManage }: { lessonId: string; canManage: 
         )}
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit(onSubmit)} className="mb-3 grid gap-2 sm:grid-cols-4">
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New material">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <Field label="Title" error={errors.title?.message}>
             <Input {...register('title')} />
           </Field>
@@ -187,14 +188,14 @@ function MaterialsPanel({ lessonId, canManage }: { lessonId: string; canManage: 
           <Field label="Content / URL">
             <Input {...register('content')} placeholder="Text, or a storage key/URL" />
           </Field>
-          <div className="flex items-end">
+          {serverError && <p className="text-xs text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Adding…' : 'Add'}
             </Button>
           </div>
-          {serverError && <p className="text-xs text-red-600 sm:col-span-4">{serverError}</p>}
         </form>
-      )}
+      </Drawer>
 
       {materialsQuery.isLoading && <LoadingState />}
       {materialsQuery.isError && <ErrorState message="Could not load materials." />}
@@ -274,17 +275,19 @@ function LessonsPanel({ moduleId, canManage }: { moduleId: string; canManage: bo
         )}
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit(onSubmit)} className="mb-3 flex items-end gap-2">
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New lesson">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <Field label="Name" error={errors.name?.message}>
             <Input {...register('name')} />
           </Field>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Adding…' : 'Add'}
-          </Button>
           {serverError && <p className="text-xs text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding…' : 'Add'}
+            </Button>
+          </div>
         </form>
-      )}
+      </Drawer>
 
       {lessonsQuery.isLoading && <LoadingState />}
       {lessonsQuery.isError && <ErrorState message="Could not load lessons." />}
@@ -371,17 +374,19 @@ function ModulesPanel({ subjectId, canManage }: { subjectId: string; canManage: 
         )}
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit(onSubmit)} className="mb-4 flex items-end gap-2">
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New module">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <Field label="Name" error={errors.name?.message}>
             <Input {...register('name')} placeholder="Module 1: Foundations" />
           </Field>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Adding…' : 'Add module'}
-          </Button>
           {serverError && <p className="text-xs text-red-600">{serverError}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding…' : 'Add module'}
+            </Button>
+          </div>
         </form>
-      )}
+      </Drawer>
 
       {modulesQuery.isLoading && <LoadingState />}
       {modulesQuery.isError && <ErrorState message="Could not load modules." />}
@@ -547,24 +552,22 @@ export default function CurriculumPage() {
               </Button>
             </div>
           )}
-          {showSubjectForm && (
-            <Card className="mb-4 p-4">
-              <form onSubmit={handleSubmit(onCreateSubject)} className="grid gap-3 sm:grid-cols-3">
-                <Field label="Name" error={errors.name?.message}>
-                  <Input {...register('name')} />
-                </Field>
-                <Field label="Description">
-                  <Input {...register('description')} placeholder="Optional" />
-                </Field>
-                <div className="flex items-end">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating…' : 'Create subject'}
-                  </Button>
-                </div>
-                {subjectError && <p className="text-xs text-red-600 sm:col-span-3">{subjectError}</p>}
-              </form>
-            </Card>
-          )}
+          <Drawer open={showSubjectForm} onClose={() => setShowSubjectForm(false)} title="New subject">
+            <form onSubmit={handleSubmit(onCreateSubject)} className="flex flex-col gap-4">
+              <Field label="Name" error={errors.name?.message}>
+                <Input {...register('name')} />
+              </Field>
+              <Field label="Description">
+                <Input {...register('description')} placeholder="Optional" />
+              </Field>
+              {subjectError && <p className="text-xs text-red-600">{subjectError}</p>}
+              <div className="flex justify-end">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Creating…' : 'Create subject'}
+                </Button>
+              </div>
+            </form>
+          </Drawer>
           {!subjectsQuery.isLoading && subjectsQuery.data?.length === 0 && (
             <EmptyState title="No subjects yet" description="Add the first subject for this course." />
           )}

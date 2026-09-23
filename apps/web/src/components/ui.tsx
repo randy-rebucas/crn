@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
+import { useEffect, useState } from 'react';
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
@@ -15,6 +16,70 @@ export function PageHeader({ title, description, action }: { title: string; desc
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</div>
+  );
+}
+
+export function Drawer({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const raf = requestAnimationFrame(() => setEntered(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setEntered(false);
+    const timeout = setTimeout(() => setMounted(false), 200);
+    return () => clearTimeout(timeout);
+  }, [open]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mounted, onClose]);
+
+  if (!mounted) return null;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className={`absolute inset-0 bg-slate-900/40 transition-opacity duration-200 ${entered ? 'opacity-100' : 'opacity-0'}`}
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        className={`absolute right-0 top-0 flex h-full w-full max-w-lg flex-col bg-white shadow-xl transition-transform duration-200 ease-out ${entered ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+      </div>
+    </div>
   );
 }
 

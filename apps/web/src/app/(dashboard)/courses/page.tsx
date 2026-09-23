@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -63,38 +64,35 @@ function CreateCourseForm({ programs, onCreated }: { programs: Program[]; onCrea
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New course</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Program" error={errors.programId?.message}>
-          <Select {...register('programId')} defaultValue="">
-            <option value="" disabled>
-              Select program…
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Program" error={errors.programId?.message}>
+        <Select {...register('programId')} defaultValue="">
+          <option value="" disabled>
+            Select program…
+          </option>
+          {programs.map((program) => (
+            <option key={program.id} value={program.id}>
+              {program.name}
             </option>
-            {programs.map((program) => (
-              <option key={program.id} value={program.id}>
-                {program.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Name" error={errors.name?.message}>
-          <Input placeholder="Fundamentals of Nursing" {...register('name')} />
-        </Field>
-        <Field label="Code" error={errors.code?.message}>
-          <Input placeholder="NUR-101" {...register('code')} />
-        </Field>
-        <Field label="Description">
-          <Input placeholder="Optional" {...register('description')} />
-        </Field>
-        <div className="flex items-end lg:col-span-4">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create course'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 lg:col-span-4">{serverError}</p>}
-      </form>
-    </Card>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Name" error={errors.name?.message}>
+        <Input placeholder="Fundamentals of Nursing" {...register('name')} />
+      </Field>
+      <Field label="Code" error={errors.code?.message}>
+        <Input placeholder="NUR-101" {...register('code')} />
+      </Field>
+      <Field label="Description">
+        <Input placeholder="Optional" {...register('description')} />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create course'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -143,17 +141,15 @@ export default function CoursesPage() {
         </Field>
       </div>
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateCourseForm
-            programs={programs ?? []}
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['courses'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New course">
+        <CreateCourseForm
+          programs={programs ?? []}
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['courses'] });
+          }}
+        />
+      </Drawer>
 
       {!effectiveProgramId && !programsLoading && (
         <EmptyState title="No programs yet" description="Create a program first to manage its courses." />

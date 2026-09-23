@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -122,9 +123,7 @@ function CreateRoleForm({
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New role</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Name" error={errors.name?.message}>
             <Input {...register('name')} placeholder="Branch Coordinator" />
@@ -187,14 +186,13 @@ function CreateRoleForm({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+        <div className="flex justify-end">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating…' : 'Create role'}
           </Button>
-          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
         </div>
       </form>
-    </Card>
   );
 }
 
@@ -257,23 +255,21 @@ export default function RolesPage() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          {permissionsQuery.isLoading && <LoadingState />}
-          {permissionsQuery.isError && (
-            <ErrorState message="Could not load available permissions. You may be missing the permissions.manage permission." />
-          )}
-          {!permissionsQuery.isLoading && !permissionsQuery.isError && (
-            <CreateRoleForm
-              permissions={permissions}
-              onCreated={() => {
-                setShowForm(false);
-                queryClient.invalidateQueries({ queryKey: ['roles'] });
-              }}
-            />
-          )}
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New role">
+        {permissionsQuery.isLoading && <LoadingState />}
+        {permissionsQuery.isError && (
+          <ErrorState message="Could not load available permissions. You may be missing the permissions.manage permission." />
+        )}
+        {!permissionsQuery.isLoading && !permissionsQuery.isError && (
+          <CreateRoleForm
+            permissions={permissions}
+            onCreated={() => {
+              setShowForm(false);
+              queryClient.invalidateQueries({ queryKey: ['roles'] });
+            }}
+          />
+        )}
+      </Drawer>
 
       {rolesQuery.isLoading && <LoadingState />}
       {rolesQuery.isError && <ErrorState message="Could not load roles." />}

@@ -12,6 +12,7 @@ import { GradingView } from '@/components/grading-view';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -333,9 +334,8 @@ function CreateQuestionForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New question</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-3">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <SubjectCascadePicker picker={picker} required />
 
         <Field label="Type">
@@ -467,15 +467,15 @@ function CreateQuestionForm({ onCreated }: { onCreated: () => void }) {
             <Input {...register('tags')} placeholder="Comma-separated, optional" />
           </Field>
         </div>
+      </div>
 
-        <div className="sm:col-span-3">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create question'}
-          </Button>
-          {serverError && <p className="mt-2 text-sm text-red-600">{serverError}</p>}
-        </div>
-      </form>
-    </Card>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create question'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -530,16 +530,14 @@ function QuestionBankTab() {
         )}
       </div>
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateQuestionForm
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['questions'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New question">
+        <CreateQuestionForm
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['questions'] });
+          }}
+        />
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load questions." />}
@@ -662,67 +660,64 @@ function CreateExamForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New exam</h2>
-      <p className="mb-4 text-xs text-slate-500">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <p className="text-xs text-slate-500">
         Questions are added to the exam individually from the Question Bank after it is created (each exam question
         pulls one approved/published question at a time — see “Manage questions” below).
       </p>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-3">
-        <Field label="Title" error={errors.title?.message}>
-          <Input {...register('title')} />
-        </Field>
-        <Field label="Type">
-          <Select {...register('type')}>
-            {EXAM_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Program">
-          <Select {...register('programId')}>
-            <option value="">None</option>
-            {(programs ?? []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Time limit (minutes)">
-          <Input type="number" {...register('timeLimitMinutes')} placeholder="Optional" />
-        </Field>
-        <Field label="Passing score" error={errors.passingScore?.message}>
-          <Input type="number" {...register('passingScore')} />
-        </Field>
-        <Field label="Attempt limit">
-          <Input type="number" {...register('attemptLimit')} placeholder="Default 1" />
-        </Field>
-        <Field label="Result release">
-          <Select {...register('resultRelease')}>
-            <option value="IMMEDIATE">Immediate</option>
-            <option value="DELAYED">Delayed</option>
-          </Select>
-        </Field>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" {...register('shuffleQuestions')} />
-          Shuffle questions
-        </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" {...register('shuffleOptions')} />
-          Shuffle options
-        </label>
+      <Field label="Title" error={errors.title?.message}>
+        <Input {...register('title')} />
+      </Field>
+      <Field label="Type">
+        <Select {...register('type')}>
+          {EXAM_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Program">
+        <Select {...register('programId')}>
+          <option value="">None</option>
+          {(programs ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Time limit (minutes)">
+        <Input type="number" {...register('timeLimitMinutes')} placeholder="Optional" />
+      </Field>
+      <Field label="Passing score" error={errors.passingScore?.message}>
+        <Input type="number" {...register('passingScore')} />
+      </Field>
+      <Field label="Attempt limit">
+        <Input type="number" {...register('attemptLimit')} placeholder="Default 1" />
+      </Field>
+      <Field label="Result release">
+        <Select {...register('resultRelease')}>
+          <option value="IMMEDIATE">Immediate</option>
+          <option value="DELAYED">Delayed</option>
+        </Select>
+      </Field>
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" {...register('shuffleQuestions')} />
+        Shuffle questions
+      </label>
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" {...register('shuffleOptions')} />
+        Shuffle options
+      </label>
 
-        <div className="sm:col-span-3">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create exam'}
-          </Button>
-          {serverError && <p className="mt-2 text-sm text-red-600">{serverError}</p>}
-        </div>
-      </form>
-    </Card>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create exam'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -843,16 +838,14 @@ function ExamsTab() {
         )}
       </div>
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateExamForm
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['exams'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New exam">
+        <CreateExamForm
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['exams'] });
+          }}
+        />
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load exams." />}

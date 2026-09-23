@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -94,32 +95,29 @@ function CreateLeadForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New lead</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="Full name" error={errors.fullName?.message}>
-          <Input {...register('fullName')} />
-        </Field>
-        <Field label="Email" error={errors.email?.message}>
-          <Input type="email" {...register('email')} />
-        </Field>
-        <Field label="Phone">
-          <Input {...register('phone')} />
-        </Field>
-        <Field label="Program interest">
-          <Input {...register('programInterest')} />
-        </Field>
-        <Field label="Source">
-          <Input placeholder="Facebook, walk-in, referral…" {...register('source')} />
-        </Field>
-        <div className="flex items-end lg:col-span-5">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create lead'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 lg:col-span-5">{serverError}</p>}
-      </form>
-    </Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Full name" error={errors.fullName?.message}>
+        <Input {...register('fullName')} />
+      </Field>
+      <Field label="Email" error={errors.email?.message}>
+        <Input type="email" {...register('email')} />
+      </Field>
+      <Field label="Phone">
+        <Input {...register('phone')} />
+      </Field>
+      <Field label="Program interest">
+        <Input {...register('programInterest')} />
+      </Field>
+      <Field label="Source">
+        <Input placeholder="Facebook, walk-in, referral…" {...register('source')} />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create lead'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -226,16 +224,14 @@ export default function LeadsPage() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateLeadForm
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['leads'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New lead">
+        <CreateLeadForm
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+          }}
+        />
+      </Drawer>
 
       <div className="mb-4 w-56">
         <Field label="Filter by status">
@@ -276,8 +272,8 @@ export default function LeadsPage() {
                 const nextOptions = LEAD_TRANSITIONS[lead.status] ?? [];
                 const expanded = expandedId === lead.id;
                 return (
-                  <>
-                    <tr key={lead.id}>
+                  <Fragment key={lead.id}>
+                    <tr>
                       <td className="px-4 py-3 font-medium text-slate-900">{lead.fullName}</td>
                       <td className="px-4 py-3 text-slate-600">
                         <div>{lead.email ?? '—'}</div>
@@ -330,7 +326,7 @@ export default function LeadsPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

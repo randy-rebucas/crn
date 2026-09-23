@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -58,32 +59,29 @@ function CreateStudentForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New student</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="First name" error={errors.firstName?.message}>
-          <Input {...register('firstName')} />
-        </Field>
-        <Field label="Last name" error={errors.lastName?.message}>
-          <Input {...register('lastName')} />
-        </Field>
-        <Field label="Email" error={errors.email?.message}>
-          <Input type="email" {...register('email')} />
-        </Field>
-        <Field label="Temporary password" error={errors.password?.message}>
-          <Input type="password" {...register('password')} />
-        </Field>
-        <Field label="Phone">
-          <Input {...register('phone')} />
-        </Field>
-        <div className="flex items-end lg:col-span-4">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create student'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 lg:col-span-4">{serverError}</p>}
-      </form>
-    </Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="First name" error={errors.firstName?.message}>
+        <Input {...register('firstName')} />
+      </Field>
+      <Field label="Last name" error={errors.lastName?.message}>
+        <Input {...register('lastName')} />
+      </Field>
+      <Field label="Email" error={errors.email?.message}>
+        <Input type="email" {...register('email')} />
+      </Field>
+      <Field label="Temporary password" error={errors.password?.message}>
+        <Input type="password" {...register('password')} />
+      </Field>
+      <Field label="Phone">
+        <Input {...register('phone')} />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create student'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -109,16 +107,14 @@ export default function StudentsPage() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          <CreateStudentForm
-            onCreated={() => {
-              setShowForm(false);
-              queryClient.invalidateQueries({ queryKey: ['students'] });
-            }}
-          />
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New student">
+        <CreateStudentForm
+          onCreated={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+          }}
+        />
+      </Drawer>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message="Could not load students." />}

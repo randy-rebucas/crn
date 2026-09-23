@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   Button,
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   Field,
@@ -106,40 +107,37 @@ function CreateAdmissionForm({
   };
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">New admission</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Lead (Application stage)" error={errors.leadId?.message}>
-          <Select {...register('leadId')}>
-            <option value="">Select a lead…</option>
-            {applicationLeads.map((lead) => (
-              <option key={lead.id} value={lead.id}>
-                {lead.fullName}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Program">
-          <Select {...register('programId')}>
-            <option value="">Unspecified</option>
-            {programs.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Notes">
-          <Input {...register('notes')} placeholder="Optional" />
-        </Field>
-        <div className="flex items-end">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create admission'}
-          </Button>
-        </div>
-        {serverError && <p className="text-sm text-red-600 lg:col-span-4">{serverError}</p>}
-      </form>
-    </Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Lead (Application stage)" error={errors.leadId?.message}>
+        <Select {...register('leadId')}>
+          <option value="">Select a lead…</option>
+          {applicationLeads.map((lead) => (
+            <option key={lead.id} value={lead.id}>
+              {lead.fullName}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Program">
+        <Select {...register('programId')}>
+          <option value="">Unspecified</option>
+          {programs.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Notes">
+        <Input {...register('notes')} placeholder="Optional" />
+      </Field>
+      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating…' : 'Create admission'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -188,24 +186,22 @@ export default function AdmissionsPage() {
         }
       />
 
-      {showForm && (
-        <div className="mb-6">
-          {loadingLookups && <LoadingState />}
-          {!loadingLookups && (leadsQuery.isError || programsQuery.isError) && (
-            <ErrorState message="Could not load leads or programs." />
-          )}
-          {!loadingLookups && !leadsQuery.isError && !programsQuery.isError && (
-            <CreateAdmissionForm
-              leads={leadsQuery.data ?? []}
-              programs={programsQuery.data ?? []}
-              onCreated={() => {
-                setShowForm(false);
-                queryClient.invalidateQueries({ queryKey: ['admissions'] });
-              }}
-            />
-          )}
-        </div>
-      )}
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New admission">
+        {loadingLookups && <LoadingState />}
+        {!loadingLookups && (leadsQuery.isError || programsQuery.isError) && (
+          <ErrorState message="Could not load leads or programs." />
+        )}
+        {!loadingLookups && !leadsQuery.isError && !programsQuery.isError && (
+          <CreateAdmissionForm
+            leads={leadsQuery.data ?? []}
+            programs={programsQuery.data ?? []}
+            onCreated={() => {
+              setShowForm(false);
+              queryClient.invalidateQueries({ queryKey: ['admissions'] });
+            }}
+          />
+        )}
+      </Drawer>
 
       <div className="mb-4 w-56">
         <Field label="Filter by status">

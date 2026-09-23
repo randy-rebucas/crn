@@ -9,6 +9,33 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Shared by revenueSummary's `monthly` field and attemptsTrend: buckets a
+  // set of dated rows into the last N calendar months (oldest first), zero-
+  // filling months with no activity so dashboard sparklines get a stable
+  // number of points instead of skipping gaps in the data. `value` lets the
+  // caller sum an amount (revenue) instead of just counting rows (attempts).
+  private bucketByMonth(rows: { date: Date; value?: number }[], months: number) {
+    const buckets = new Map<string, number>();
+    const cursor = new Date();
+    cursor.setDate(1);
+    cursor.setHours(0, 0, 0, 0);
+    const keys: string[] = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(cursor.getFullYear(), cursor.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      keys.push(key);
+      buckets.set(key, 0);
+    }
+    for (const row of rows) {
+      const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}`;
+      if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + (row.value ?? 1));
+    }
+    return keys.map((key) => ({
+      month: new Date(`${key}-01`).toLocaleDateString('en-US', { month: 'short' }),
+      value: buckets.get(key) ?? 0,
+    }));
+  }
+
   async enrollmentFunnel(organizationId: string) {
     const grouped = await this.prisma.enrollment.groupBy({
       by: ['status'],
@@ -20,7 +47,11 @@ export class ReportsService {
   }
 
   async revenueSummary(organizationId: string) {
-    const [invoiceTotals, verifiedPayments, byBranch] = await Promise.all([
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5, 1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    const [invoiceTotals, verifiedPayments, byBranch, recentPayments] = await Promise.all([
       this.prisma.invoice.aggregate({
         where: { organizationId, status: { not: InvoiceStatus.CANCELLED } },
         _sum: { totalAmount: true },
@@ -33,6 +64,10 @@ export class ReportsService {
         by: ['branchId'],
         where: { organizationId, status: { not: InvoiceStatus.CANCELLED } },
         _sum: { totalAmount: true },
+      }),
+      this.prisma.payment.findMany({
+        where: { status: PaymentStatus.VERIFIED, invoice: { organizationId }, createdAt: { gte: sixMonthsAgo } },
+        select: { createdAt: true, amount: true },
       }),
     ]);
 
@@ -57,6 +92,10 @@ export class ReportsService {
         branchName: branchNameById.get(row.branchId) ?? row.branchId,
         invoiced: row._sum.totalAmount ?? 0,
       })),
+      monthly: this.bucketByMonth(
+        recentPayments.map((p) => ({ date: p.createdAt, value: p.amount })),
+        6,
+      ),
     };
   }
 
@@ -111,5 +150,28 @@ export class ReportsService {
     );
 
     return results;
+  }
+
+  // Organization-wide graded-attempt volume by month, for the dashboard's
+  // "Graded Exam Attempts" sparkline — distinct from examPerformance, which
+  // is per-exam and has no time dimension.
+  async attemptsTrend(organizationId: string) {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5, 1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    const attempts = await this.prisma.attempt.findMany({
+      where: {
+        status: AttemptStatus.GRADED,
+        exam: { organizationId },
+        gradedAt: { gte: sixMonthsAgo },
+      },
+      select: { gradedAt: true },
+    });
+
+    return this.bucketByMonth(
+      attempts.filter((a) => a.gradedAt).map((a) => ({ date: a.gradedAt as Date })),
+      6,
+    );
   }
 }
