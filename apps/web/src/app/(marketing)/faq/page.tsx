@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ReactMarkdown from 'react-markdown';
 import { API_BASE_URL } from '@/lib/api-client';
 
 export const metadata: Metadata = {
@@ -39,7 +40,9 @@ export default async function FaqPage() {
               <summary className="cursor-pointer list-none font-heading font-semibold text-slate-900">
                 {item.question}
               </summary>
-              <p className="mt-3 text-sm text-slate-600">{item.answer}</p>
+              <div className="mt-3 space-y-2 text-sm text-slate-600 [&_a]:text-brand-maroon [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+                <ReactMarkdown>{item.answer}</ReactMarkdown>
+              </div>
             </details>
           ))}
         </div>

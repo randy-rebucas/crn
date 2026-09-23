@@ -28,21 +28,34 @@ interface Student {
   user: { id: string; email: string; firstName: string; lastName: string; status: string };
 }
 
+// Loose but useful: accepts common PH formats like 09171234567 or +63 917 123 4567.
+const PHONE_REGEX = /^[+]?[\d\s().-]{7,20}$/;
+
+const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+
+function generateTempPassword(length = 12) {
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (n) => TEMP_PASSWORD_CHARS[n % TEMP_PASSWORD_CHARS.length]).join('');
+}
+
 const createStudentSchema = z.object({
   firstName: z.string().min(1, 'Required'),
   lastName: z.string().min(1, 'Required'),
-  email: z.string().email(),
+  email: z.string().email('Enter a valid email address'),
   password: z.string().min(8, 'At least 8 characters'),
-  phone: z.string().optional(),
+  phone: z.union([z.literal(''), z.string().regex(PHONE_REGEX, 'Enter a valid phone number')]).optional(),
 });
 type CreateStudentValues = z.infer<typeof createStudentSchema>;
 
 function CreateStudentForm({ onCreated }: { onCreated: () => void }) {
   const [serverError, setServerError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CreateStudentValues>({ resolver: zodResolver(createStudentSchema) });
 
@@ -70,10 +83,25 @@ function CreateStudentForm({ onCreated }: { onCreated: () => void }) {
         <Input type="email" {...register('email')} />
       </Field>
       <Field label="Temporary password" error={errors.password?.message}>
-        <Input type="password" {...register('password')} />
+        <div className="flex gap-2">
+          <Input type={showPassword ? 'text' : 'password'} {...register('password')} />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setValue('password', generateTempPassword(), { shouldValidate: true });
+              setShowPassword(true);
+            }}
+          >
+            Generate
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setShowPassword((v) => !v)}>
+            {showPassword ? 'Hide' : 'Show'}
+          </Button>
+        </div>
       </Field>
-      <Field label="Phone">
-        <Input {...register('phone')} />
+      <Field label="Phone" error={errors.phone?.message}>
+        <Input type="tel" placeholder="09XX XXX XXXX" {...register('phone')} />
       </Field>
       {serverError && <p className="text-sm text-red-600">{serverError}</p>}
       <div className="flex justify-end">

@@ -19,6 +19,7 @@ import {
   LoadingState,
   PageHeader,
   Select,
+  Textarea,
 } from '@/components/ui';
 
 interface Program {
@@ -84,7 +85,7 @@ function CreateCourseForm({ programs, onCreated }: { programs: Program[]; onCrea
         <Input placeholder="NUR-101" {...register('code')} />
       </Field>
       <Field label="Description">
-        <Input placeholder="Optional" {...register('description')} />
+        <Textarea placeholder="Optional" rows={4} {...register('description')} />
       </Field>
       {serverError && <p className="text-sm text-red-600">{serverError}</p>}
       <div className="flex justify-end">

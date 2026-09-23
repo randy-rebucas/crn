@@ -19,6 +19,7 @@ import {
   LoadingState,
   PageHeader,
   Select,
+  Textarea,
 } from '@/components/ui';
 
 const PERMISSION_SCOPES = [
@@ -132,7 +133,7 @@ function CreateRoleForm({
             <Input {...register('key')} placeholder="branch_coordinator" />
           </Field>
           <Field label="Description">
-            <Input {...register('description')} placeholder="Optional" />
+            <Textarea {...register('description')} rows={3} placeholder="Optional" />
           </Field>
         </div>
 

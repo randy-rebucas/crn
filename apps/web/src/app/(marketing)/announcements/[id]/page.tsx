@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
 import { API_BASE_URL } from '@/lib/api-client';
 
 interface PublicAnnouncement {
@@ -41,7 +42,9 @@ export default async function AnnouncementDetailsPage({ params }: { params: Prom
         {new Date(announcement.publishedAt ?? announcement.createdAt).toLocaleDateString()}
       </p>
       <h1 className="mt-1 font-heading text-3xl font-bold text-slate-900">{announcement.title}</h1>
-      <p className="mt-4 whitespace-pre-line text-slate-600">{announcement.body}</p>
+      <div className="mt-4 space-y-3 text-slate-600 [&_a]:text-brand-maroon [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+        <ReactMarkdown>{announcement.body}</ReactMarkdown>
+      </div>
     </div>
   );
 }

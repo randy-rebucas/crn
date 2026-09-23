@@ -20,6 +20,7 @@ import {
   PageHeader,
   Select,
   StatusBadge,
+  Textarea,
 } from '@/components/ui';
 
 type ContentStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
@@ -558,7 +559,7 @@ export default function CurriculumPage() {
                 <Input {...register('name')} />
               </Field>
               <Field label="Description">
-                <Input {...register('description')} placeholder="Optional" />
+                <Textarea {...register('description')} rows={4} placeholder="Optional" />
               </Field>
               {subjectError && <p className="text-xs text-red-600">{subjectError}</p>}
               <div className="flex justify-end">

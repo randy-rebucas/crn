@@ -20,6 +20,7 @@ import {
   PageHeader,
   Select,
   StatusBadge,
+  Textarea,
 } from '@/components/ui';
 
 // ---------------------------------------------------------------------------
@@ -669,7 +670,7 @@ function RefundsSection() {
             <Input type="number" {...register('amount')} />
           </Field>
           <Field label="Reason" error={errors.reason?.message}>
-            <Input {...register('reason')} />
+            <Textarea {...register('reason')} rows={3} />
           </Field>
           {serverError && <p className="text-sm text-red-600">{serverError}</p>}
           <div className="flex justify-end">

@@ -1,5 +1,7 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import type { UseFormRegisterReturn } from 'react-hook-form';
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
@@ -109,6 +111,57 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
       className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none disabled:bg-slate-50"
       {...props}
     />
+  );
+}
+
+export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      rows={3}
+      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none disabled:bg-slate-50"
+      {...props}
+    />
+  );
+}
+
+export function MarkdownField({
+  registration,
+  value,
+  placeholder,
+  rows = 6,
+}: {
+  registration: UseFormRegisterReturn;
+  value: string | undefined;
+  placeholder?: string;
+  rows?: number;
+}) {
+  const [tab, setTab] = useState<'write' | 'preview'>('write');
+  return (
+    <div>
+      <div className="mb-1 flex gap-3 text-xs font-medium">
+        <button
+          type="button"
+          onClick={() => setTab('write')}
+          className={tab === 'write' ? 'text-red-600' : 'text-slate-400'}
+        >
+          Write
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('preview')}
+          className={tab === 'preview' ? 'text-red-600' : 'text-slate-400'}
+        >
+          Preview
+        </button>
+      </div>
+      {tab === 'write' ? (
+        <Textarea rows={rows} placeholder={placeholder} {...registration} />
+      ) : (
+        <div className="min-h-[132px] space-y-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 [&_a]:text-red-600 [&_a]:underline [&_code]:rounded [&_code]:bg-slate-200 [&_code]:px-1 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+          {value ? <ReactMarkdown>{value}</ReactMarkdown> : <p className="text-slate-400">Nothing to preview yet.</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

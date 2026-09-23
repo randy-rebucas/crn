@@ -55,14 +55,33 @@ const LEAD_TRANSITIONS: Record<string, string[]> = {
 
 const LEAD_STATUS_FILTERS = ['LEAD', 'INQUIRY', 'APPLICATION', 'APPLICANT', 'ENROLLED', 'LOST'] as const;
 
+const LEAD_SOURCES = [
+  'Walk-in',
+  'Phone inquiry',
+  'Website',
+  'Facebook',
+  'Referral',
+  'School fair',
+  'Advertisement',
+  'Other',
+] as const;
+
+// Loose but useful: accepts common PH formats like 09171234567 or +63 917 123 4567.
+const PHONE_REGEX = /^[+]?[\d\s().-]{7,20}$/;
+
+interface Program {
+  id: string;
+  name: string;
+}
+
 function errorMessage(err: unknown, fallback: string) {
   return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
 }
 
 const createLeadSchema = z.object({
   fullName: z.string().min(1, 'Required'),
-  email: z.union([z.literal(''), z.string().email()]).optional(),
-  phone: z.string().optional(),
+  email: z.union([z.literal(''), z.string().email('Enter a valid email address')]).optional(),
+  phone: z.union([z.literal(''), z.string().regex(PHONE_REGEX, 'Enter a valid phone number')]).optional(),
   programInterest: z.string().optional(),
   source: z.string().optional(),
 });
@@ -70,6 +89,10 @@ type CreateLeadValues = z.infer<typeof createLeadSchema>;
 
 function CreateLeadForm({ onCreated }: { onCreated: () => void }) {
   const [serverError, setServerError] = useState<string | null>(null);
+  const { data: programs } = useQuery<Program[]>({
+    queryKey: ['programs'],
+    queryFn: async () => (await apiClient.get('/v1/programs')).data,
+  });
   const {
     register,
     handleSubmit,
@@ -102,14 +125,26 @@ function CreateLeadForm({ onCreated }: { onCreated: () => void }) {
       <Field label="Email" error={errors.email?.message}>
         <Input type="email" {...register('email')} />
       </Field>
-      <Field label="Phone">
-        <Input {...register('phone')} />
+      <Field label="Phone" error={errors.phone?.message}>
+        <Input type="tel" placeholder="09XX XXX XXXX" {...register('phone')} />
       </Field>
       <Field label="Program interest">
-        <Input {...register('programInterest')} />
+        <Input list="program-interest-options" placeholder="Start typing a program…" {...register('programInterest')} />
+        <datalist id="program-interest-options">
+          {(programs ?? []).map((p) => (
+            <option key={p.id} value={p.name} />
+          ))}
+        </datalist>
       </Field>
       <Field label="Source">
-        <Input placeholder="Facebook, walk-in, referral…" {...register('source')} />
+        <Select {...register('source')}>
+          <option value="">Select source…</option>
+          {LEAD_SOURCES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
       </Field>
       {serverError && <p className="text-sm text-red-600">{serverError}</p>}
       <div className="flex justify-end">

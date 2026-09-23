@@ -15,11 +15,11 @@ import {
   EmptyState,
   ErrorState,
   Field,
-  Input,
   LoadingState,
   PageHeader,
   Select,
   StatusBadge,
+  Textarea,
 } from '@/components/ui';
 
 type AdmissionStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
@@ -129,7 +129,7 @@ function CreateAdmissionForm({
         </Select>
       </Field>
       <Field label="Notes">
-        <Input {...register('notes')} placeholder="Optional" />
+        <Textarea {...register('notes')} rows={4} placeholder="Optional" />
       </Field>
       {serverError && <p className="text-sm text-red-600">{serverError}</p>}
       <div className="flex justify-end">

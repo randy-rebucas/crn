@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import ReactMarkdown from 'react-markdown';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -18,7 +19,16 @@ import {
   LoadingState,
   PageHeader,
   StatusBadge,
+  Textarea,
 } from '@/components/ui';
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
 interface Program {
   id: string;
@@ -56,29 +66,77 @@ function useProgramActions() {
 }
 
 function CreateProgramForm({ onCreated }: { onCreated: () => void }) {
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [descriptionTab, setDescriptionTab] = useState<'write' | 'preview'>('write');
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateProgramValues>({ resolver: zodResolver(createProgramSchema) });
+
+  const { onChange: onSlugChange, ...slugField } = register('slug');
+  const description = watch('description');
 
   const onSubmit = async (values: CreateProgramValues) => {
     await apiClient.post('/v1/programs', values);
     reset();
+    setSlugTouched(false);
     onCreated();
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <Field label="Name" error={errors.name?.message}>
-        <Input placeholder="Nursing Review" {...register('name')} />
+        <Input
+          placeholder="Nursing Review"
+          {...register('name', {
+            onChange: (e) => {
+              if (!slugTouched) setValue('slug', slugify(e.target.value), { shouldValidate: true });
+            },
+          })}
+        />
       </Field>
       <Field label="Slug" error={errors.slug?.message}>
-        <Input placeholder="nursing-review" {...register('slug')} />
+        <Input
+          placeholder="nursing-review"
+          {...slugField}
+          onChange={(e) => {
+            setSlugTouched(true);
+            onSlugChange(e);
+          }}
+        />
       </Field>
       <Field label="Description">
-        <Input placeholder="Optional" {...register('description')} />
+        <div className="mb-1 flex gap-3 text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setDescriptionTab('write')}
+            className={descriptionTab === 'write' ? 'text-red-600' : 'text-slate-400'}
+          >
+            Write
+          </button>
+          <button
+            type="button"
+            onClick={() => setDescriptionTab('preview')}
+            className={descriptionTab === 'preview' ? 'text-red-600' : 'text-slate-400'}
+          >
+            Preview
+          </button>
+        </div>
+        {descriptionTab === 'write' ? (
+          <Textarea placeholder="Optional. Supports Markdown." rows={6} {...register('description')} />
+        ) : (
+          <div className="min-h-[132px] space-y-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 [&_a]:text-red-600 [&_a]:underline [&_code]:rounded [&_code]:bg-slate-200 [&_code]:px-1 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+            {description ? (
+              <ReactMarkdown>{description}</ReactMarkdown>
+            ) : (
+              <p className="text-slate-400">Nothing to preview yet.</p>
+            )}
+          </div>
+        )}
       </Field>
       <div className="flex justify-end">
         <Button type="submit" disabled={isSubmitting}>

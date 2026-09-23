@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
 import { API_BASE_URL } from '@/lib/api-client';
 
 interface PublicCourse {
@@ -45,7 +46,11 @@ export default async function ProgramDetailsPage({ params }: { params: Promise<{
         ← Back to programs
       </Link>
       <h1 className="mt-4 font-heading text-3xl font-bold text-slate-900">{program.name}</h1>
-      {program.description && <p className="mt-4 max-w-2xl text-slate-600">{program.description}</p>}
+      {program.description && (
+        <div className="mt-4 max-w-2xl space-y-3 text-slate-600 [&_a]:text-brand-maroon [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+          <ReactMarkdown>{program.description}</ReactMarkdown>
+        </div>
+      )}
 
       <h2 className="mt-10 font-heading text-xl font-semibold text-slate-900">Courses</h2>
       {program.courses.length === 0 ? (

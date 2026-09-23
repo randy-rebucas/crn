@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import ReactMarkdown from 'react-markdown';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -17,6 +18,7 @@ import {
   Field,
   Input,
   LoadingState,
+  MarkdownField,
   PageHeader,
   Select,
   StatusBadge,
@@ -102,6 +104,7 @@ function AnnouncementsTab({ canManage }: { canManage: boolean }) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateAnnouncementValues>({ resolver: zodResolver(createAnnouncementSchema) });
   const [serverError, setServerError] = useState<string | null>(null);
@@ -137,11 +140,7 @@ function AnnouncementsTab({ canManage }: { canManage: boolean }) {
             <Input {...register('title')} />
           </Field>
           <Field label="Body" error={errors.body?.message}>
-            <textarea
-              {...register('body')}
-              rows={3}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-            />
+            <MarkdownField registration={register('body')} value={watch('body')} rows={5} />
           </Field>
           {serverError && <p className="text-sm text-red-600">{serverError}</p>}
           <div className="flex justify-end">
@@ -164,7 +163,9 @@ function AnnouncementsTab({ canManage }: { canManage: boolean }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-slate-900">{a.title}</p>
-                <p className="mt-1 text-sm text-slate-600">{a.body}</p>
+                <div className="mt-1 space-y-1 text-sm text-slate-600 [&_a]:text-red-600 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+                  <ReactMarkdown>{a.body}</ReactMarkdown>
+                </div>
               </div>
               <StatusActions
                 status={a.status}
@@ -214,6 +215,7 @@ function SuccessStoriesTab({ canManage }: { canManage: boolean }) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateStoryValues>({ resolver: zodResolver(createStorySchema) });
   const [serverError, setServerError] = useState<string | null>(null);
@@ -258,11 +260,7 @@ function SuccessStoriesTab({ canManage }: { canManage: boolean }) {
             <Input type="number" {...register('year')} />
           </Field>
           <Field label="Testimonial" error={errors.testimonial?.message}>
-            <textarea
-              {...register('testimonial')}
-              rows={3}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-            />
+            <MarkdownField registration={register('testimonial')} value={watch('testimonial')} rows={5} />
           </Field>
           {serverError && <p className="text-sm text-red-600">{serverError}</p>}
           <div className="flex justify-end">
@@ -287,7 +285,9 @@ function SuccessStoriesTab({ canManage }: { canManage: boolean }) {
                 <p className="text-sm font-semibold text-slate-900">
                   {s.graduateName} <span className="text-xs font-normal text-slate-500">· {s.programName} {s.year ?? ''}</span>
                 </p>
-                <p className="mt-1 text-sm text-slate-600">{s.testimonial}</p>
+                <div className="mt-1 space-y-1 text-sm text-slate-600 [&_a]:text-red-600 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+                  <ReactMarkdown>{s.testimonial}</ReactMarkdown>
+                </div>
               </div>
               <StatusActions
                 status={s.status}
@@ -330,6 +330,7 @@ function FaqTab({ canManage }: { canManage: boolean }) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateFaqValues>({ resolver: zodResolver(createFaqSchema) });
   const [serverError, setServerError] = useState<string | null>(null);
@@ -365,11 +366,7 @@ function FaqTab({ canManage }: { canManage: boolean }) {
             <Input {...register('question')} />
           </Field>
           <Field label="Answer" error={errors.answer?.message}>
-            <textarea
-              {...register('answer')}
-              rows={3}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-            />
+            <MarkdownField registration={register('answer')} value={watch('answer')} rows={5} />
           </Field>
           {serverError && <p className="text-sm text-red-600">{serverError}</p>}
           <div className="flex justify-end">
@@ -390,7 +387,9 @@ function FaqTab({ canManage }: { canManage: boolean }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-slate-900">{f.question}</p>
-                <p className="mt-1 text-sm text-slate-600">{f.answer}</p>
+                <div className="mt-1 space-y-1 text-sm text-slate-600 [&_a]:text-red-600 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
+                  <ReactMarkdown>{f.answer}</ReactMarkdown>
+                </div>
               </div>
               <StatusActions
                 status={f.status}
