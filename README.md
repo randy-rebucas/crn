@@ -92,42 +92,41 @@ npm run db:down
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | Token lifetimes (`15m` / `7d` by default) |
 | `PORT` | API port (`3001`) |
 
-`apps/web` reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:3001`) and
-`NEXT_PUBLIC_USE_MOCKS` — see [Demo login](#demo-login) below.
+`apps/web` reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:3001`) — see
+[Demo login](#demo-login) below.
 
 ## Demo login
 
-There are two independent ways to sign in locally, depending on whether you're running against
-the real API or just the frontend.
-
-### Real API (recommended once `apps/api` is running)
-
-After `npm run prisma:seed` (from `apps/api`), one account per system role exists in the database,
+Sign-in always goes through the real API (`apps/api` must be running). After `npm run prisma:seed`
+(from `apps/api`), one account per system role exists in the database,
 all sharing the same password (`ChangeMe123!` if you set `SEED_ADMIN_PASSWORD=ChangeMe123!` before
 seeding — otherwise a random password is generated and printed once):
 
-| Role | Email | Scope |
-| --- | --- | --- |
-| Super Admin | `admin@obias.local` | Global — every permission, both branches |
-| Branch Manager | `north.manager@obias.local` | Branch-scoped to the seeded "North Branch" (proves scoped RBAC actually narrows queries, not just resolves permissions) |
-| Student | `student@obias.local` | Self-scoped |
-| Owner / Executive | `owner_executive@obias.local` | Organization |
-| Operations Manager | `operations_manager@obias.local` | Organization |
-| Academic Director | `academic_director@obias.local` | Organization |
-| Lead Instructor | `lead_instructor@obias.local` | Branch |
-| Instructor | `instructor@obias.local` | Assigned |
-| Content Manager | `content_manager@obias.local` | Organization |
-| Exam Administrator | `exam_administrator@obias.local` | Organization |
-| Registrar | `registrar@obias.local` | Branch |
-| Admissions Officer | `admissions_officer@obias.local` | Branch |
-| Front Desk Staff | `front_desk_staff@obias.local` | Branch |
-| General Staff | `general_staff@obias.local` | Branch |
-| Finance Manager | `finance_manager@obias.local` | Branch |
-| Finance Officer | `finance_officer@obias.local` | Branch |
-| Cashier | `cashier@obias.local` | Branch |
-| HR Manager | `hr_manager@obias.local` | Organization |
-| HR Staff | `hr_staff@obias.local` | Organization |
-| Auditor | `auditor@obias.local` | Organization (read-only) |
+| Role | Email | Password | Scope |
+| --- | --- | --- | --- |
+| Super Admin | `admin@obias.local` | `ChangeMe123!` | Global — every permission, both branches |
+| Branch Manager | `north.manager@obias.local` | `ChangeMe123!` | Branch-scoped to the seeded "North Branch" (proves scoped RBAC actually narrows queries, not just resolves permissions) |
+| Student | `student@obias.local` | `ChangeMe123!` | Self-scoped |
+| Owner / Executive | `owner_executive@obias.local` | `ChangeMe123!` | Organization |
+| Operations Manager | `operations_manager@obias.local` | `ChangeMe123!` | Organization |
+| Academic Director | `academic_director@obias.local` | `ChangeMe123!` | Organization |
+| Lead Instructor | `lead_instructor@obias.local` | `ChangeMe123!` | Branch |
+| Instructor | `instructor@obias.local` | `ChangeMe123!` | Assigned |
+| Content Manager | `content_manager@obias.local` | `ChangeMe123!` | Organization |
+| Exam Administrator | `exam_administrator@obias.local` | `ChangeMe123!` | Organization |
+| Registrar | `registrar@obias.local` | `ChangeMe123!` | Branch |
+| Admissions Officer | `admissions_officer@obias.local` | `ChangeMe123!` | Branch |
+| Front Desk Staff | `front_desk_staff@obias.local` | `ChangeMe123!` | Branch |
+| General Staff | `general_staff@obias.local` | `ChangeMe123!` | Branch |
+| Finance Manager | `finance_manager@obias.local` | `ChangeMe123!` | Branch |
+| Finance Officer | `finance_officer@obias.local` | `ChangeMe123!` | Branch |
+| Cashier | `cashier@obias.local` | `ChangeMe123!` | Branch |
+| HR Manager | `hr_manager@obias.local` | `ChangeMe123!` | Organization |
+| HR Staff | `hr_staff@obias.local` | `ChangeMe123!` | Organization |
+| Auditor | `auditor@obias.local` | `ChangeMe123!` | Organization (read-only) |
+
+`ChangeMe123!` only applies if you seed with `SEED_ADMIN_PASSWORD=ChangeMe123!` (see above) — without
+it, every account shares one randomly generated password printed once at seed time.
 
 The seed is idempotent and additive: re-running it after adding a new permission key backfills
 that permission onto the `super_admin`, `student`, and `branch_manager` system roles, but it will
@@ -136,43 +135,9 @@ that permission onto the `super_admin`, `student`, and `branch_manager` system r
 These are local-development credentials only — change or remove them before deploying to a
 shared or production environment.
 
-### Frontend-only mocks (no API required)
-
-`apps/web` can also mock auth entirely in the browser, useful for UI/permission work without a
-running backend. It's controlled by `NEXT_PUBLIC_USE_MOCKS` (see
-[`apps/web/src/lib/mock-auth.ts`](apps/web/src/lib/mock-auth.ts)):
-
-- `NEXT_PUBLIC_USE_MOCKS=false` (or the real API is reachable) — real `/v1/auth/*` calls hit `apps/api`.
-- Anything else (including unset) — auth/session calls are served locally from
-  [`apps/web/src/lib/demo-users.ts`](apps/web/src/lib/demo-users.ts), a set of seeded demo users
-  covering every role in the RBAC model. All other API calls still go to the real backend.
-
-| Role | Email | Password |
-| --- | --- | --- |
-| Super Admin | `superadmin@obias.demo` | `Passw0rd!` |
-| Branch Manager | `branchmanager@obias.demo` | `Passw0rd!` |
-| Owner / Executive | `ownerexecutive@obias.demo` | `Passw0rd!` |
-| Operations Manager | `operationsmanager@obias.demo` | `Passw0rd!` |
-| Academic Director | `academicdirector@obias.demo` | `Passw0rd!` |
-| Lead Instructor | `leadinstructor@obias.demo` | `Passw0rd!` |
-| Instructor | `instructor@obias.demo` | `Passw0rd!` |
-| Content Manager | `contentmanager@obias.demo` | `Passw0rd!` |
-| Exam Administrator | `examadministrator@obias.demo` | `Passw0rd!` |
-| Registrar | `registrar@obias.demo` | `Passw0rd!` |
-| Admissions Officer | `admissions@obias.demo` | `Passw0rd!` |
-| Finance Manager | `financemanager@obias.demo` | `Passw0rd!` |
-| Finance Officer | `financeofficer@obias.demo` | `Passw0rd!` |
-| Cashier | `cashier@obias.demo` | `Passw0rd!` |
-| Front Desk Staff | `frontdesk@obias.demo` | `Passw0rd!` |
-| General Staff | `generalstaff@obias.demo` | `Passw0rd!` |
-| HR Manager | `hrmanager@obias.demo` | `Passw0rd!` |
-| HR Staff | `hrstaff@obias.demo` | `Passw0rd!` |
-| Auditor | `auditor@obias.demo` | `Passw0rd!` |
-| Student | `student@obias.demo` | `Passw0rd!` |
-
-The login page has one-click buttons for each of these. After login, each role lands in the route
-group that fits it: Student → `/student`, Instructor → `/instructor`, everyone else → `/dashboard`
-(see `landingRouteForUser` in [`auth-context.tsx`](apps/web/src/lib/auth-context.tsx)).
+After login, each role lands in the route group that fits it: Student → `/student`,
+Instructor → `/instructor`, everyone else → `/dashboard` (see `landingRouteForUser` in
+[`auth-context.tsx`](apps/web/src/lib/auth-context.tsx)).
 
 ## API modules
 
