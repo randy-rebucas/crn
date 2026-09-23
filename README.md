@@ -102,12 +102,32 @@ the real API or just the frontend.
 
 ### Real API (recommended once `apps/api` is running)
 
-After `npm run prisma:seed` (from `apps/api`), two accounts exist in the database:
+After `npm run prisma:seed` (from `apps/api`), one account per system role exists in the database,
+all sharing the same password (`ChangeMe123!` if you set `SEED_ADMIN_PASSWORD=ChangeMe123!` before
+seeding — otherwise a random password is generated and printed once):
 
-| Role | Email | Password | Scope |
-| --- | --- | --- | --- |
-| Super Admin | `admin@obias.local` | `ChangeMe123!` | Global — every permission, both branches |
-| Branch Manager | `north.manager@obias.local` | `ChangeMe123!` | Branch-scoped to the seeded "North Branch" (proves scoped RBAC actually narrows queries, not just resolves permissions) |
+| Role | Email | Scope |
+| --- | --- | --- |
+| Super Admin | `admin@obias.local` | Global — every permission, both branches |
+| Branch Manager | `north.manager@obias.local` | Branch-scoped to the seeded "North Branch" (proves scoped RBAC actually narrows queries, not just resolves permissions) |
+| Student | `student@obias.local` | Self-scoped |
+| Owner / Executive | `owner_executive@obias.local` | Organization |
+| Operations Manager | `operations_manager@obias.local` | Organization |
+| Academic Director | `academic_director@obias.local` | Organization |
+| Lead Instructor | `lead_instructor@obias.local` | Branch |
+| Instructor | `instructor@obias.local` | Assigned |
+| Content Manager | `content_manager@obias.local` | Organization |
+| Exam Administrator | `exam_administrator@obias.local` | Organization |
+| Registrar | `registrar@obias.local` | Branch |
+| Admissions Officer | `admissions_officer@obias.local` | Branch |
+| Front Desk Staff | `front_desk_staff@obias.local` | Branch |
+| General Staff | `general_staff@obias.local` | Branch |
+| Finance Manager | `finance_manager@obias.local` | Branch |
+| Finance Officer | `finance_officer@obias.local` | Branch |
+| Cashier | `cashier@obias.local` | Branch |
+| HR Manager | `hr_manager@obias.local` | Organization |
+| HR Staff | `hr_staff@obias.local` | Organization |
+| Auditor | `auditor@obias.local` | Organization (read-only) |
 
 The seed is idempotent and additive: re-running it after adding a new permission key backfills
 that permission onto the `super_admin`, `student`, and `branch_manager` system roles, but it will

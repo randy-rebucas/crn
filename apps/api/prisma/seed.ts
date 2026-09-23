@@ -445,8 +445,9 @@ async function main() {
     'attendance.view',
   ]);
 
+  const catalogRoles = [];
   for (const roleSeed of ROLE_CATALOG) {
-    await upsertRole(roleSeed.key, roleSeed.name, roleSeed.scope, roleSeed.permissionKeys);
+    catalogRoles.push(await upsertRole(roleSeed.key, roleSeed.name, roleSeed.scope, roleSeed.permissionKeys));
   }
 
   // A hardcoded seed password (e.g. the previous 'ChangeMe123!') ends up
@@ -487,11 +488,44 @@ async function main() {
     },
   });
 
+  // One login per role in the catalog, so every permission set in the RBAC
+  // model has a real account to sign in and test as — not just the two
+  // accounts (super_admin, branch_manager) that predate this loop. Reuses
+  // the same seeded password as those two so there's a single credential
+  // to remember locally. super_admin and branch_manager already have their
+  // accounts above (with names/branches worth keeping distinct), so this
+  // only covers the rest of the catalog plus the student role.
+  const remainingRoles = [studentRole, ...catalogRoles];
+
+  const roleDemoUsers: { email: string; role: (typeof remainingRoles)[number] }[] = [];
+  for (const role of remainingRoles) {
+    const email = `${role.key}@obias.local`;
+    const nameParts = role.name.split(' ');
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        organizationId: org.id,
+        email,
+        passwordHash,
+        firstName: nameParts[0],
+        lastName: nameParts.slice(1).join(' ') || 'Demo',
+        branches: { create: [{ branchId: mainBranch.id }] },
+        roles: { create: [{ roleId: role.id }] },
+      },
+    });
+    roleDemoUsers.push({ email: user.email, role });
+  }
+
   console.log('Seeded organization:', org.slug);
   console.log('Seeded roles:', 3 + ROLE_CATALOG.length);
   console.log('Seeded super admin:', superAdminUser.email, `(password: ${adminPassword})`);
   console.log('Seeded branch manager:', northManagerUser.email, `(password: ${adminPassword}, branch: NORTH)`);
   console.log('Seeded student role permission holder key:', studentRole.key);
+  console.log(`Seeded ${roleDemoUsers.length} per-role demo accounts (password: ${adminPassword}):`);
+  for (const { email, role } of roleDemoUsers) {
+    console.log(`  - ${role.name}: ${email}`);
+  }
   if (!process.env.SEED_ADMIN_PASSWORD) {
     console.log('⚠ This password was randomly generated and is only shown here — save it now.');
   }

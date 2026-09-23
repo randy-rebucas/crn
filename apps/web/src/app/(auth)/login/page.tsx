@@ -11,6 +11,7 @@ import { landingRouteForUser, useAuth } from '@/lib/auth-context';
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  rememberMe: z.boolean(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -25,13 +26,16 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { rememberMe: true },
+  });
 
   const onSubmit = async (values: LoginFormValues) => {
     setServerError(null);
     try {
-      const user = await login(values.email, values.password);
-      router.push(landingRouteForUser(user));
+      const user = await login(values.email, values.password, values.rememberMe);
+      router.replace(landingRouteForUser(user));
     } catch {
       setServerError('Invalid email or password.');
     }
@@ -96,7 +100,7 @@ export default function LoginPage() {
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-slate-300 accent-brand-maroon"
-              defaultChecked
+              {...register('rememberMe')}
             />
             Remember me
           </label>
@@ -117,21 +121,7 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="my-5 flex items-center gap-3">
-        <span className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Or</span>
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <button
-        type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-      >
-        <IconGoogle className="h-4 w-4" />
-        Continue with Google
-      </button>
-
-      <div className="mt-4 text-center text-sm text-slate-500">
+      <div className="mt-5 text-center text-sm text-slate-500">
         Don&apos;t have an account?{' '}
         <Link href="/register" className="font-semibold text-brand-maroon hover:underline">
           Create one
@@ -179,29 +169,6 @@ function IconEyeOff({ className }: { className?: string }) {
         d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.24 4.24M9.36 5.32A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a13.3 13.3 0 0 1-3.15 3.9M6.6 6.6C4.1 8.2 2 12 2 12s3.5 7 10 7a9.9 9.9 0 0 0 3.4-.6"
         strokeLinecap="round"
         strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconGoogle({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className}>
-      <path
-        fill="#4285F4"
-        d="M23.5 12.27c0-.82-.07-1.42-.22-2.05H12v3.72h6.5c-.13 1.02-.84 2.56-2.42 3.6l-.02.15 3.52 2.7.24.02c2.24-2.04 3.68-5.04 3.68-8.14Z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 24c3.24 0 5.95-1.06 7.93-2.88l-3.78-2.9c-1.01.7-2.37 1.19-4.15 1.19-3.17 0-5.86-2.09-6.82-4.98l-.14.01-3.66 2.82-.05.13C3.31 21.3 7.33 24 12 24Z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.18 14.42A7.2 7.2 0 0 1 4.8 12c0-.84.15-1.65.37-2.42L5.16 9.4 1.45 6.5l-.12.06A11.97 11.97 0 0 0 0 12c0 1.93.46 3.76 1.33 5.38l3.85-2.96Z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 4.75c2.26 0 3.78.97 4.65 1.79l3.4-3.32C17.94 1.19 15.24 0 12 0 7.33 0 3.31 2.7 1.33 6.62l3.85 2.96C6.14 6.84 8.83 4.75 12 4.75Z"
       />
     </svg>
   );

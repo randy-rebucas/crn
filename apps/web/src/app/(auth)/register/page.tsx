@@ -37,7 +37,7 @@ export default function RegisterPage() {
       // Registration doesn't return a session — sign the new account in
       // immediately so it isn't a dead end.
       const user = await login(values.email, values.password);
-      router.push(landingRouteForUser(user));
+      router.replace(landingRouteForUser(user));
     } catch (err) {
       setServerError(
         (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ??

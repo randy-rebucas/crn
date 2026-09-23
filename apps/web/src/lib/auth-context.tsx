@@ -20,7 +20,7 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<AuthUser>;
   logout: () => Promise<void>;
   hasPermission: (key: string) => boolean;
 }
@@ -29,6 +29,31 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const REFRESH_TOKEN_KEY = 'obias.refreshToken';
 
+// "Remember me" decides which storage survives closing the browser tab:
+// localStorage persists across sessions, sessionStorage clears when the
+// tab closes. Whichever one holds the token, only one holds it at a time.
+function getStoredRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(REFRESH_TOKEN_KEY) ?? sessionStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function storeRefreshToken(token: string, rememberMe: boolean) {
+  if (typeof window === 'undefined') return;
+  if (rememberMe) {
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
+  }
+}
+
+function clearStoredRefreshToken() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   // Only start "loading" if there's actually a session to restore — this
@@ -36,12 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // never calls setState synchronously within its own call stack (the
   // react-hooks/set-state-in-effect rule flags that pattern even though the
   // function is async, because nothing awaits before that branch returns).
-  const [isLoading, setIsLoading] = useState(
-    () => typeof window !== 'undefined' && !!localStorage.getItem(REFRESH_TOKEN_KEY),
-  );
+  const [isLoading, setIsLoading] = useState(() => !!getStoredRefreshToken());
 
   const restoreSession = useCallback(async () => {
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem(REFRESH_TOKEN_KEY) : null;
+    const refreshToken = getStoredRefreshToken();
+    // A restored session keeps whichever storage it was found in — if it
+    // came from sessionStorage (remember me was off), the refreshed token
+    // stays in sessionStorage rather than being promoted to localStorage.
+    const rememberMe = typeof window !== 'undefined' && !!localStorage.getItem(REFRESH_TOKEN_KEY);
 
     if (!refreshToken) {
       return;
@@ -50,11 +77,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await apiClient.post('/v1/auth/refresh', { refreshToken });
       setAccessToken(data.accessToken);
-      localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+      storeRefreshToken(data.refreshToken, rememberMe);
       const { data: me } = await apiClient.get('/v1/users/me');
       setUser(me);
     } catch {
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      clearStoredRefreshToken();
       setAccessToken(null);
     } finally {
       setIsLoading(false);
@@ -65,20 +92,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     restoreSession();
   }, [restoreSession]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, rememberMe = true) => {
     const { data } = await apiClient.post('/v1/auth/login', { email, password });
     setAccessToken(data.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+    storeRefreshToken(data.refreshToken, rememberMe);
     setUser(data.user);
     return data.user as AuthUser;
   }, []);
 
   const logout = useCallback(async () => {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    const refreshToken = getStoredRefreshToken();
     if (refreshToken) {
       await apiClient.post('/v1/auth/logout', { refreshToken }).catch(() => undefined);
     }
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    clearStoredRefreshToken();
     setAccessToken(null);
     setUser(null);
   }, []);
