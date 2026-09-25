@@ -1,43 +1,24 @@
-import { Card } from '@/components/ui';
-import { StudentShell, StudentPageHeader } from '@/components/student-ui';
+import { API_BASE_URL } from '@/lib/api-client';
+import { fetchPublicSettings } from '@/lib/public-settings';
+import { type FaqItem, HelpView } from './help-view';
 
-const FAQS = [
-  {
-    q: 'I missed a scheduled class or exam — what do I do?',
-    a: 'Reach out to your registrar or program coordinator directly; they can advise on makeup sessions or reschedules.',
-  },
-  {
-    q: 'My enrollment status looks wrong.',
-    a: 'Enrollment status is set by the registrar as your requirements and payments are verified. Contact your branch office if it looks stale.',
-  },
-  {
-    q: 'I can’t see a course, lesson, or exam I expect to have access to.',
-    a: 'Content only appears once it’s published for your program and you have an active enrollment for the current batch.',
-  },
-];
+// Help & Support. There's no support-ticketing API, so this routes students
+// to the portal page that answers their question, or to the center's real
+// contact channels (GET /v1/public/settings, with PRODUCT.md fallbacks), and
+// adds the center's published FAQ (GET /v1/public/faq) under the
+// portal-specific questions. Fetched here on the server; rendered by the
+// client HelpView.
 
-// Static help content — there's no support-ticketing or org-contact API yet,
-// so this is guidance + FAQ only, not a live contact form.
-export default function StudentHelpPage() {
-  return (
-    <StudentShell>
-      <StudentPageHeader title="Help &amp; Support" description="Common questions and where to go for help." />
+async function fetchFaq(): Promise<FaqItem[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/public/faq`, { next: { revalidate: 60 } });
+    return res.ok ? ((await res.json()) as FaqItem[]) : [];
+  } catch {
+    return [];
+  }
+}
 
-      <Card className="p-4">
-        <p className="text-sm text-slate-600">
-          For anything account-specific — enrollment, payments, schedules, or exam issues — contact your branch
-          registrar or program coordinator. They can see your record and act on it directly.
-        </p>
-      </Card>
-
-      <div className="mt-6 space-y-2">
-        {FAQS.map((item) => (
-          <Card key={item.q} className="p-4">
-            <p className="text-sm font-medium text-slate-900">{item.q}</p>
-            <p className="mt-1 text-sm text-slate-500">{item.a}</p>
-          </Card>
-        ))}
-      </div>
-    </StudentShell>
-  );
+export default async function StudentHelpPage() {
+  const [settings, centerFaq] = await Promise.all([fetchPublicSettings(), fetchFaq()]);
+  return <HelpView settings={settings} centerFaq={centerFaq} />;
 }

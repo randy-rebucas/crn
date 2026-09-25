@@ -419,9 +419,49 @@ model StudentProfile {
   attendances  Attendance[]
   attempts     Attempt[]
   certificates Certificate[]
+  preferences  StudentPreferences?
 
   @@index([organizationId])
   @@map("student_profiles")
+}
+
+// One row per StudentProfile, created lazily on first save — a student who
+// never opened Settings gets STUDENT_PREFERENCE_DEFAULTS. Everything here is
+// the student's own choice; registrar-owned data stays on StudentProfile.
+model StudentPreferences {
+  id               String @id @default(uuid())
+  studentProfileId String @unique
+  organizationId   String
+
+  // In-app notification categories. Account and enrollment notices have no
+  // toggle: they're always delivered (see notificationCategory()).
+  notifySchedule      Boolean @default(true)
+  notifyExams         Boolean @default(true)
+  notifyAnnouncements Boolean @default(true)
+  notifyPayments      Boolean @default(true)
+  notifyCertificates  Boolean @default(true)
+
+  // Extra delivery channels on top of in-app, for when those senders exist.
+  emailEnabled Boolean @default(true)
+  smsEnabled   Boolean @default(false)
+
+  // Reminders. null turns one off. studyReminderTime is "HH:MM" in the
+  // organization's timezone.
+  classReminderMinutes Int?    @default(60)
+  studyReminderTime    String?
+  weeklyDigest         Boolean @default(true)
+
+  // Consent. Both opt-in, as the Data Privacy Act expects.
+  allowSuccessStory Boolean @default(false)
+  marketingOptIn    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("student_preferences")
 }
 
 model InstructorProfile {

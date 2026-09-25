@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ContentStatus } from '@prisma/client';
+import { ContentStatus, EnrollmentStatus, MaterialType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { publishedOnlyWhere } from '../../common/authz/content-visibility.js';
@@ -17,6 +17,19 @@ const ALLOWED_CONTENT_TRANSITIONS: Record<ContentStatus, ContentStatus[]> = {
   PUBLISHED: [ContentStatus.ARCHIVED],
   ARCHIVED: [],
 };
+
+// Enrollments that grant access to a program's study library — the same
+// set the student portal treats as "active", plus COMPLETED so graduates
+// keep their materials.
+const LIBRARY_ENROLLMENT_STATUSES: EnrollmentStatus[] = [
+  EnrollmentStatus.APPROVED,
+  EnrollmentStatus.PAYMENT_PENDING,
+  EnrollmentStatus.PAYMENT_VERIFIED,
+  EnrollmentStatus.ENROLLED,
+  EnrollmentStatus.COMPLETED,
+];
+
+export const MATERIAL_TYPES = Object.values(MaterialType);
 
 @Injectable()
 export class CurriculumService {
@@ -103,6 +116,85 @@ export class CurriculumService {
         ...publishedOnlyWhere(user, 'courses.update'),
       },
       orderBy: { position: 'asc' },
+    });
+  }
+
+  // A student's library across every program they're enrolled in, flattened
+  // out of the course > subject > module > lesson tree so the student portal
+  // can list e.g. all videos without walking four levels of requests. Every
+  // level must be PUBLISHED — a published material under a draft lesson is
+  // still hidden. Callers without a student profile get an empty list.
+  async findMyMaterials(user: AuthenticatedUser, types: MaterialType[]) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { userId: user.id, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!profile) return [];
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { studentId: profile.id, status: { in: LIBRARY_ENROLLMENT_STATUSES } },
+      select: { programId: true },
+    });
+    const programIds = [...new Set(enrollments.map((e) => e.programId))];
+    if (programIds.length === 0) return [];
+
+    const materials = await this.prisma.material.findMany({
+      where: {
+        status: ContentStatus.PUBLISHED,
+        ...(types.length > 0 ? { type: { in: types } } : {}),
+        lesson: {
+          status: ContentStatus.PUBLISHED,
+          module: {
+            status: ContentStatus.PUBLISHED,
+            subject: {
+              status: ContentStatus.PUBLISHED,
+              course: {
+                status: ContentStatus.PUBLISHED,
+                programId: { in: programIds },
+                program: { organizationId: user.organizationId },
+              },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        content: true,
+        position: true,
+        updatedAt: true,
+        lesson: {
+          select: {
+            id: true,
+            name: true,
+            position: true,
+            module: {
+              select: {
+                id: true,
+                name: true,
+                position: true,
+                subject: {
+                  select: { id: true, name: true, course: { select: { id: true, name: true, code: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Curriculum order: course code, subject, module, lesson, then material.
+    return materials.sort((a, b) => {
+      const am = a.lesson.module;
+      const bm = b.lesson.module;
+      return (
+        am.subject.course.code.localeCompare(bm.subject.course.code) ||
+        am.subject.name.localeCompare(bm.subject.name) ||
+        am.position - bm.position ||
+        a.lesson.position - b.lesson.position ||
+        a.position - b.position
+      );
     });
   }
 

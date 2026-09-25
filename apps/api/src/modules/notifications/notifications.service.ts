@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { notificationToggle, readStudentPreferencesByUser } from '../students/student-preferences.js';
 
 export interface NotificationEvent {
   organizationId: string;
@@ -17,7 +18,14 @@ export interface NotificationEvent {
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Returns null when the recipient is a student who muted this category.
+  // Callers already ignore the return value, so a muted event is a no-op.
   async emit(event: NotificationEvent) {
+    const toggle = notificationToggle(event.type);
+    if (toggle) {
+      const prefs = await readStudentPreferencesByUser(this.prisma, event.userId);
+      if (prefs && !prefs[toggle]) return null;
+    }
     return this.prisma.notification.create({
       data: {
         organizationId: event.organizationId,

@@ -530,6 +530,15 @@ async function main() {
         roles: { create: [{ roleId: role.id }] },
       },
     });
+    // The student login needs a StudentProfile too, or every /students/me
+    // screen (settings, preferences) reports "no profile linked".
+    if (role.id === studentRole.id) {
+      await prisma.studentProfile.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: { userId: user.id, organizationId: org.id, branchId: mainBranch.id },
+      });
+    }
     roleDemoUsers.push({ email: user.email, role });
   }
 

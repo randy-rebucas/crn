@@ -1,11 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import type { MaterialType } from '@prisma/client';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { PermissionsGuard } from '../../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
-import { CurriculumService } from './curriculum.service.js';
+import { CurriculumService, MATERIAL_TYPES } from './curriculum.service.js';
 import { CreateModuleDto } from './dto/create-module.dto.js';
 import { CreateLessonDto } from './dto/create-lesson.dto.js';
 import { CreateMaterialDto } from './dto/create-material.dto.js';
@@ -71,6 +72,22 @@ export class LessonsController {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MaterialsController {
   constructor(private readonly curriculum: CurriculumService) {}
+
+  // The caller's own study library. `?type=VIDEO` or `?type=PDF,DOCUMENT`
+  // narrows by material type; omit it for everything.
+  @Get('v1/materials/mine')
+  @RequirePermissions('courses.view')
+  findMine(@CurrentUser() user: AuthenticatedUser, @Query('type') type?: string) {
+    const requested = (type ?? '')
+      .split(',')
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+    const invalid = requested.filter((t) => !MATERIAL_TYPES.includes(t as MaterialType));
+    if (invalid.length > 0) {
+      throw new BadRequestException(`Unknown material type: ${invalid.join(', ')}`);
+    }
+    return this.curriculum.findMyMaterials(user, requested as MaterialType[]);
+  }
 
   @Get('v1/materials')
   @RequirePermissions('courses.view')

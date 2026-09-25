@@ -5,6 +5,13 @@ import { AuditService } from '../audit/audit.service.js';
 import { getScope, studentScopeWhere } from '../../common/authz/scope.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
+import type { UpdateMyStudentDto } from './dto/update-my-student.dto.js';
+import type { UpdateMyPreferencesDto } from './dto/update-my-preferences.dto.js';
+import { STUDENT_PREFERENCE_DEFAULTS, type EffectiveStudentPreferences } from './student-preferences.js';
+
+const PREFERENCES_SELECT = Object.fromEntries(
+  Object.keys(STUDENT_PREFERENCE_DEFAULTS).map((k) => [k, true]),
+) as { [K in keyof EffectiveStudentPreferences]: true };
 
 const PROFILE_SELECT = {
   id: true,
@@ -77,6 +84,88 @@ export class StudentsService {
     });
     if (!student) throw new NotFoundException('Student not found');
     return student;
+  }
+
+  // Self-service edit, keyed on the caller's own userId rather than a
+  // client-supplied id, so no scope check is needed: a caller can only ever
+  // reach their own profile.
+  async updateMine(user: AuthenticatedUser, dto: UpdateMyStudentDto) {
+    const before = await this.prisma.studentProfile.findFirst({
+      where: { userId: user.id, organizationId: user.organizationId },
+      select: PROFILE_SELECT,
+    });
+    if (!before) throw new NotFoundException('No student profile for this account');
+
+    const after = await this.prisma.studentProfile.update({
+      where: { id: before.id },
+      data: {
+        address: dto.address,
+        emergencyContactName: dto.emergencyContactName,
+        emergencyContactPhone: dto.emergencyContactPhone,
+        user: dto.phone === undefined ? undefined : { update: { phone: dto.phone } },
+      },
+      select: PROFILE_SELECT,
+    });
+
+    await this.audit.log({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: 'student.self_updated',
+      resource: 'student_profile',
+      resourceId: after.id,
+      beforeState: before,
+      afterState: after,
+    });
+
+    return after;
+  }
+
+  private async myProfileId(user: AuthenticatedUser) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { userId: user.id, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!profile) throw new NotFoundException('No student profile for this account');
+    return profile.id;
+  }
+
+  // Defaults until the student first saves, so there's no row to backfill
+  // for existing students.
+  async getMyPreferences(user: AuthenticatedUser): Promise<EffectiveStudentPreferences> {
+    const studentProfileId = await this.myProfileId(user);
+    const row = await this.prisma.studentPreferences.findUnique({
+      where: { studentProfileId },
+      select: PREFERENCES_SELECT,
+    });
+    return row ?? STUDENT_PREFERENCE_DEFAULTS;
+  }
+
+  async updateMyPreferences(user: AuthenticatedUser, dto: UpdateMyPreferencesDto) {
+    const studentProfileId = await this.myProfileId(user);
+    const before = await this.prisma.studentPreferences.findUnique({
+      where: { studentProfileId },
+      select: PREFERENCES_SELECT,
+    });
+
+    const after = await this.prisma.studentPreferences.upsert({
+      where: { studentProfileId },
+      create: { ...STUDENT_PREFERENCE_DEFAULTS, ...dto, studentProfileId, organizationId: user.organizationId },
+      update: dto,
+      select: PREFERENCES_SELECT,
+    });
+
+    // Consent changes (success stories, marketing) need a trail.
+    await this.audit.log({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: 'student.preferences_updated',
+      resource: 'student_profile',
+      resourceId: studentProfileId,
+      beforeState: before ?? STUDENT_PREFERENCE_DEFAULTS,
+      afterState: after,
+    });
+
+    return after;
   }
 
   // roleIds/branchId are opaque ids from client input — without this check

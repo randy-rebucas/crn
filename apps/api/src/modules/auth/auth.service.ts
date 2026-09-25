@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
@@ -220,6 +220,59 @@ export class AuthService {
       action: 'auth.password_reset.requested',
       resource: 'user',
       resourceId: user.id,
+    });
+  }
+
+  // Signed-in password change. Requires the current password even though the
+  // caller holds a valid access token — a borrowed unlocked device shouldn't
+  // be enough to take the account over. Every other session is revoked;
+  // `keepRefreshToken` (the caller's own) is spared so they stay signed in.
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    keepRefreshToken: string | undefined,
+    ctx: RequestContext,
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.status !== 'ACTIVE') throw new UnauthorizedException();
+
+    if (!(await argon2.verify(user.passwordHash, currentPassword))) {
+      await this.audit.log({
+        organizationId: user.organizationId,
+        actorId: user.id,
+        action: 'auth.password_change.failed',
+        resource: 'user',
+        resourceId: user.id,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+        reason: 'bad_password',
+      });
+      throw new BadRequestException('Your current password is incorrect');
+    }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('Choose a password different from your current one');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+    const keepHash = keepRefreshToken ? this.hashToken(keepRefreshToken) : undefined;
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null, ...(keepHash ? { tokenHash: { not: keepHash } } : {}) },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.log({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: 'auth.password_change.completed',
+      resource: 'user',
+      resourceId: user.id,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
     });
   }
 

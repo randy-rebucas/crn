@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useMyNotifications, useMyStudentProfile } from '@/lib/student-hooks';
 import { BottomTabBar, MobileNavDrawer, StudentSidebar, StudentTopBar, icons } from '@/components/student-ui';
@@ -14,22 +14,39 @@ const TAB_ITEMS = [
   { label: 'Profile', href: '/student/profile', icon: icons.profile },
 ];
 
-// Full nav list, used by both the desktop sidebar and the mobile
-// hamburger drawer. The 5-slot BottomTabBar only surfaces the items a
-// student needs one tap away most often (mirrored in TAB_ITEMS above);
-// everything else — Progress, Certificates, Notifications, Help,
-// Settings — lives here instead of being buried behind Profile.
-const SIDEBAR_ITEMS = [
-  { label: 'Dashboard', href: '/student', icon: icons.home },
-  { label: 'My Courses', href: '/student/learn', icon: icons.learn },
-  { label: 'Exams', href: '/student/exams', icon: icons.exams },
-  { label: 'Schedule', href: '/student/schedule', icon: icons.schedule },
-  { label: 'Progress', href: '/student/progress', icon: icons.progress },
-  { label: 'Certificates', href: '/student/certificates', icon: icons.certificate },
-  { label: 'Notifications', href: '/student/notifications', icon: icons.bell },
-  { label: 'Profile', href: '/student/profile', icon: icons.profile },
-  { label: 'Help & Support', href: '/student/help', icon: icons.help },
-  { label: 'Settings', href: '/student/profile', icon: icons.settings },
+// Full nav, used by both the desktop sidebar and the mobile hamburger
+// drawer, split into study pages and account pages. The 5-slot
+// BottomTabBar only surfaces the items a student needs one tap away most
+// often (mirrored in TAB_ITEMS above). `keywords` feed the top-bar page
+// search. Each href appears once, so exactly one item is ever active.
+const NAV_MAIN = [
+  { label: 'Dashboard', href: '/student', icon: icons.home, keywords: 'home overview today' },
+  { label: 'My Courses', href: '/student/learn', icon: icons.learn, keywords: 'learn lessons subjects modules curriculum' },
+  { label: 'Video Lessons', href: '/student/videos', icon: icons.video, keywords: 'videos lectures recordings watch' },
+  { label: 'Practice Exams', href: '/student/practice-exams', icon: icons.practice, keywords: 'mock board final test' },
+  { label: 'Quizzes', href: '/student/quizzes', icon: icons.quiz, keywords: 'practice diagnostic test' },
+  { label: 'Study Materials', href: '/student/materials', icon: icons.materials, keywords: 'handouts notes pdf documents downloads' },
+  { label: 'Schedule', href: '/student/schedule', icon: icons.schedule, keywords: 'classes calendar timetable' },
+  { label: 'Progress', href: '/student/progress', icon: icons.progress, keywords: 'performance results scores grades' },
+  { label: 'Certificates', href: '/student/certificates', icon: icons.certificate, keywords: 'credentials completion' },
+  { label: 'Notifications', href: '/student/notifications', icon: icons.bell, keywords: 'announcements alerts updates news' },
+];
+
+// Settings is where a student edits their account (contact details,
+// password); /student/profile stays the read-only summary, reached from the
+// bottom tab bar and the account menu.
+const NAV_ACCOUNT = [
+  { label: 'Help & Support', href: '/student/help', icon: icons.help, keywords: 'faq contact assistance' },
+  { label: 'Settings', href: '/student/settings', icon: icons.settings, keywords: 'account password phone address emergency contact' },
+];
+
+// Search also reaches the combined exam catalog, which has no nav slot of
+// its own (Practice Exams and Quizzes are its two halves).
+const SEARCH_ITEMS = [
+  ...NAV_MAIN,
+  { label: 'All exams', href: '/student/exams', icon: icons.exams, keywords: 'exams mock quiz practice diagnostic final' },
+  { label: 'Profile', href: '/student/profile', icon: icons.profile, keywords: 'profile personal details enrollments' },
+  ...NAV_ACCOUNT,
 ];
 
 // Auth-gating mirrors (dashboard)/layout.tsx. Below `lg` the shell is a
@@ -50,18 +67,27 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     }
   }, [isLoading, user, router]);
 
+  const main = useMemo(
+    () => NAV_MAIN.map((item) => (item.href === '/student/notifications' ? { ...item, badge: unreadCount } : item)),
+    [unreadCount],
+  );
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
   if (isLoading || !user) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>;
   }
 
   return (
-    <div className="flex flex-1 bg-slate-50">
-      <StudentSidebar items={SIDEBAR_ITEMS} />
-      <MobileNavDrawer items={SIDEBAR_ITEMS} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    <div className="flex flex-1 bg-slate-50 selection:bg-red-100 selection:text-red-900">
+      <StudentSidebar main={main} account={NAV_ACCOUNT} />
+      <MobileNavDrawer main={main} account={NAV_ACCOUNT} open={drawerOpen} onClose={closeDrawer} />
       <div className="flex min-w-0 flex-1 flex-col">
         <StudentTopBar
           unreadCount={unreadCount}
-          name={profile.data?.user.firstName}
+          firstName={profile.data?.user.firstName}
+          lastName={profile.data?.user.lastName}
+          email={profile.data?.user.email ?? user.email}
+          searchItems={SEARCH_ITEMS}
           onMenuClick={() => setDrawerOpen(true)}
         />
         {children}

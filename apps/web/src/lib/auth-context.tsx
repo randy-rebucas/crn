@@ -32,7 +32,8 @@ const REFRESH_TOKEN_KEY = 'obias.refreshToken';
 // "Remember me" decides which storage survives closing the browser tab:
 // localStorage persists across sessions, sessionStorage clears when the
 // tab closes. Whichever one holds the token, only one holds it at a time.
-function getStoredRefreshToken(): string | null {
+// Exported so a password change can tell the API which session to keep.
+export function getStoredRefreshToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem(REFRESH_TOKEN_KEY) ?? sessionStorage.getItem(REFRESH_TOKEN_KEY);
 }

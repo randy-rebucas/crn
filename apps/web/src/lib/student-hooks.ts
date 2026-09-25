@@ -15,7 +15,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './api-client';
-import { useAuth } from './auth-context';
+import { getStoredRefreshToken, useAuth } from './auth-context';
 
 export interface StudentProfile {
   id: string;
@@ -85,6 +85,77 @@ export function useMyEnrollments() {
   });
 }
 
+// PATCH /v1/students/me resolves the profile from the caller's own userId.
+// Only contact fields are editable; `null` clears one.
+export interface MyContactDetails {
+  phone: string | null;
+  address: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+}
+
+export function useUpdateMyContactDetails() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: MyContactDetails) => (await apiClient.patch<StudentProfile>('/v1/students/me', body)).data,
+    onSuccess: (data) => queryClient.setQueryData(['my-student-profile'], data),
+  });
+}
+
+// GET/PATCH /v1/students/me/preferences — the caller's own notification,
+// reminder and consent choices. GET returns defaults until the first save.
+export interface StudentPreferences {
+  notifySchedule: boolean;
+  notifyExams: boolean;
+  notifyAnnouncements: boolean;
+  notifyPayments: boolean;
+  notifyCertificates: boolean;
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+  classReminderMinutes: number | null;
+  studyReminderTime: string | null;
+  weeklyDigest: boolean;
+  allowSuccessStory: boolean;
+  marketingOptIn: boolean;
+}
+
+export function useMyPreferences() {
+  const { user } = useAuth();
+  return useQuery<StudentPreferences>({
+    queryKey: ['my-preferences'],
+    enabled: Boolean(user),
+    queryFn: async () => (await apiClient.get<StudentPreferences>('/v1/students/me/preferences')).data,
+  });
+}
+
+// Optimistic: toggles flip immediately and roll back if the save fails.
+export function useUpdateMyPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Partial<StudentPreferences>) =>
+      (await apiClient.patch<StudentPreferences>('/v1/students/me/preferences', patch)).data,
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: ['my-preferences'] });
+      const previous = queryClient.getQueryData<StudentPreferences>(['my-preferences']);
+      if (previous) queryClient.setQueryData(['my-preferences'], { ...previous, ...patch });
+      return { previous };
+    },
+    onError: (_err, _patch, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(['my-preferences'], ctx.previous);
+    },
+    onSuccess: (data) => queryClient.setQueryData(['my-preferences'], data),
+  });
+}
+
+// POST /v1/auth/change-password signs out every other session; passing our
+// own refresh token keeps this one alive.
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
+      apiClient.post('/v1/auth/change-password', { ...body, refreshToken: getStoredRefreshToken() ?? undefined }),
+  });
+}
+
 const ACTIVE_ENROLLMENT_PRIORITY = ['ENROLLED', 'PAYMENT_VERIFIED', 'PAYMENT_PENDING', 'APPROVED'];
 
 export function pickActiveEnrollment(enrollments: Enrollment[] | undefined): Enrollment | null {
@@ -123,6 +194,48 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: (id: string) => apiClient.patch(`/v1/notifications/${id}/read`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-notifications'] }),
+  });
+}
+
+// PATCH /v1/notifications/read-all marks every one of the caller's
+// notifications read in one request.
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.patch('/v1/notifications/read-all'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-notifications'] }),
+  });
+}
+
+export type MaterialType = 'TEXT' | 'IMAGE' | 'PDF' | 'DOCUMENT' | 'VIDEO' | 'AUDIO' | 'DOWNLOAD' | 'FLASHCARD';
+
+export interface LibraryMaterial {
+  id: string;
+  title: string;
+  type: MaterialType;
+  content: string | null;
+  updatedAt: string;
+  lesson: {
+    id: string;
+    name: string;
+    module: {
+      id: string;
+      name: string;
+      subject: { id: string; name: string; course: { id: string; name: string; code: string } };
+    };
+  };
+}
+
+// GET /v1/materials/mine is self-scoped server-side: published materials
+// (published at every level of the tree) from the caller's enrolled
+// programs, already in curriculum order.
+export function useMyMaterials(types: MaterialType[]) {
+  const { user } = useAuth();
+  const type = types.join(',');
+  return useQuery<LibraryMaterial[]>({
+    queryKey: ['my-materials', type],
+    enabled: Boolean(user),
+    queryFn: async () => (await apiClient.get<LibraryMaterial[]>('/v1/materials/mine', { params: { type } })).data,
   });
 }
 
