@@ -383,10 +383,18 @@ function initials(student: RosterStudent) {
 // Shared by (dashboard)/attendance (org-wide) and (instructor)/instructor/attendance
 // (`myClassesOnly` narrows the class picker to sections the caller teaches) so the
 // two shells don't fork the marking logic — only which classes are selectable differs.
-export function AttendanceView({ myClassesOnly = false }: { myClassesOnly?: boolean }) {
+export function AttendanceView({
+  myClassesOnly = false,
+  initialClassId,
+}: {
+  myClassesOnly?: boolean;
+  // Preselects a class when linked from elsewhere (e.g. the instructor's
+  // Classes page); ignored if it isn't one of the selectable classes.
+  initialClassId?: string;
+}) {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const [classFilter, setClassFilter] = useState('');
+  const [classFilter, setClassFilter] = useState(initialClassId ?? '');
   const [date, setDate] = useState(() => toDayKey(new Date()));
   const [rosterFilter, setRosterFilter] = useState<RosterFilter>('ALL');
   const [search, setSearch] = useState('');
@@ -404,7 +412,7 @@ export function AttendanceView({ myClassesOnly = false }: { myClassesOnly?: bool
     [allClasses, myClassesOnly, user?.id],
   );
 
-  const classId = classFilter || classes[0]?.id || '';
+  const classId = (classes.some((c) => c.id === classFilter) ? classFilter : classes[0]?.id) || '';
   const selectedClass = classes.find((c) => c.id === classId);
 
   const { data: roster = [], isLoading: rosterLoading } = useQuery<RosterStudent[]>({

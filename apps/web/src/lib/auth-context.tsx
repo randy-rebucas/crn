@@ -156,7 +156,8 @@ export function useAuth() {
 // admin sidebar. A user can hold multiple roles, so this is a priority
 // order, not an exclusive switch.
 export function landingRouteForUser(user: Pick<AuthUser, 'roles'>): string {
-  if (user.roles.includes('Student')) return '/student';
-  if (user.roles.includes('Instructor')) return '/instructor';
+  // `roles` holds role keys (e.g. 'lead_instructor'), not display names.
+  if (user.roles.includes('student')) return '/student';
+  if (user.roles.some((r) => r === 'instructor' || r === 'lead_instructor')) return '/instructor';
   return '/dashboard';
 }

@@ -87,7 +87,7 @@ npm run db:down
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Postgres connection string (`postgresql://obias:obias_dev_password@localhost:55432/obias?schema=public` for the Docker Compose setup) |
+| `DATABASE_URL` | Postgres connection string (`postgresql://obias:obias_dev_password@127.0.0.1:55432/obias?schema=public` for the Docker Compose setup; use `127.0.0.1`, not `localhost` — the container binds IPv4 only and Node may resolve `localhost` to `::1`) |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Signing secrets for access/refresh tokens |
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | Token lifetimes (`15m` / `7d` by default) |
 | `PORT` | API port (`3001`) |

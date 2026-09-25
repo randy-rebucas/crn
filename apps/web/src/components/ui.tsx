@@ -226,6 +226,7 @@ const STATUS_TONE: Record<string, keyof typeof BADGE_TONES> = {
   ACTIVE: 'green',
   ON_LEAVE: 'gold',
   UPCOMING: 'blue',
+  SCHEDULED: 'blue',
   REQUESTED: 'gold',
   OFFICER_APPROVED: 'blue',
   PROCESSED: 'green',
