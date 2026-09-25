@@ -25,6 +25,22 @@ export class CertificatesService {
     });
   }
 
+  // The caller's own certificates, resolved from their student profile.
+  // Students don't hold certificates.view (and its SELF scope isn't
+  // supported by certificateScopeWhere), so this is their only way in.
+  async findMine(user: AuthenticatedUser) {
+    const student = await this.prisma.studentProfile.findFirst({
+      where: { userId: user.id, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!student) return [];
+    return this.prisma.certificate.findMany({
+      where: { organizationId: user.organizationId, studentId: student.id },
+      include: { program: { select: { name: true } } },
+      orderBy: { issuedAt: 'desc' },
+    });
+  }
+
   // Public verification: no auth, deliberately returns only what a
   // third party (employer, licensing board) needs to trust the
   // certificate — never internal ids, contact info, or financial data.

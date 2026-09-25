@@ -1,10 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { formatTime, minutesOf } from '@/lib/instructor-schedule';
-import { useMyEnrollments, useMyStudentProfile, pickActiveEnrollment } from '@/lib/student-hooks';
+import {
+  type MyClass,
+  type MyClassMeeting,
+  pickActiveEnrollment,
+  useMyEnrollments,
+  useMySchedule,
+  useMyStudentProfile,
+} from '@/lib/student-hooks';
 import {
   HeroFigure,
   Panel,
@@ -15,23 +22,8 @@ import {
   icons,
 } from '@/components/student-ui';
 
-interface ClassItem {
-  id: string;
-  name: string;
-  batchId: string;
-  status: string;
-  course?: { id: string; code: string; name: string };
-  room?: { name: string } | null;
-  instructor?: { user: { firstName: string; lastName: string } } | null;
-}
-
-interface ScheduleItem {
-  id: string;
-  classId: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-}
+type ClassItem = MyClass;
+type ScheduleItem = MyClassMeeting;
 
 interface AttendanceItem {
   id: string;
@@ -48,9 +40,8 @@ interface Meeting {
 // Read-only: attendance is marked by an instructor (or QR flow), never by
 // the student. No self check-in control exists on this page by design.
 //
-// GAP: `GET /v1/classes` has no batchId filter, so every class in the org is
-// fetched and narrowed to the active batch here, then one schedules request
-// fans out per class.
+// Classes and meetings come from the self-scoped GET /v1/schedules/me (every
+// batch the student is enrolled in), narrowed to the active batch here.
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -482,34 +473,12 @@ function AttendanceHistory({ records, classById }: { records: AttendanceItem[]; 
 // Page
 // ---------------------------------------------------------------------------
 
-// Module-level so useQueries can memoize the combined result between renders.
-function combineSchedules(results: { data?: ScheduleItem[]; isLoading: boolean }[]) {
-  return { data: results.map((r) => r.data), loading: results.some((r) => r.isLoading) };
-}
-
 export default function StudentSchedulePage() {
   const [now] = useState(() => new Date());
   const profile = useMyStudentProfile();
   const enrollments = useMyEnrollments();
   const active = pickActiveEnrollment(enrollments.data);
-
-  const classesQuery = useQuery<ClassItem[]>({
-    queryKey: ['classes-for-batch', active?.batchId],
-    enabled: Boolean(active?.batchId),
-    queryFn: async () => {
-      const { data } = await apiClient.get<ClassItem[]>('/v1/classes');
-      return data.filter((c) => c.batchId === active!.batchId && c.status !== 'CANCELLED');
-    },
-  });
-
-  const schedules = useQueries({
-    queries: (classesQuery.data ?? []).map((cls) => ({
-      queryKey: ['schedules-for-class', cls.id],
-      queryFn: async () => (await apiClient.get<ScheduleItem[]>('/v1/schedules', { params: { classId: cls.id } })).data,
-      enabled: Boolean(classesQuery.data),
-    })),
-    combine: combineSchedules,
-  });
+  const classesQuery = useMySchedule();
 
   // GET /v1/attendance?studentId= requires `attendance.view`; studentId here
   // is the StudentProfile id (not the User id).
@@ -521,13 +490,12 @@ export default function StudentSchedulePage() {
       (await apiClient.get<AttendanceItem[]>('/v1/attendance', { params: { studentId: profile.data!.id } })).data,
   });
 
-  const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
-  const classById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
-  const schedulesLoading = schedules.loading;
-  const meetings = useMemo<Meeting[]>(
-    () => classes.flatMap((cls, idx) => (schedules.data[idx] ?? []).map((schedule) => ({ cls, schedule }))),
-    [classes, schedules.data],
+  const classes = useMemo(
+    () => (classesQuery.data ?? []).filter((c) => c.batchId === active?.batchId),
+    [classesQuery.data, active?.batchId],
   );
+  const classById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
+  const meetings = useMemo<Meeting[]>(() => classes.flatMap((cls) => cls.schedules.map((schedule) => ({ cls, schedule }))), [classes]);
 
   // One color per course, in course-code order.
   const courses = useMemo(() => {
@@ -590,7 +558,7 @@ export default function StudentSchedulePage() {
         <HeroFigure
           icon={glyphs.clock}
           tone="bg-blue-50 text-blue-700"
-          value={isLoading || schedulesLoading ? dash : hoursLabel(weeklyMinutes)}
+          value={isLoading ? dash : hoursLabel(weeklyMinutes)}
           label="Hours per week"
         />
         <HeroFigure
@@ -637,9 +605,7 @@ export default function StudentSchedulePage() {
       {!isLoading && classes.length > 0 && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
           <div className="grid min-w-0 gap-5">
-            {schedulesLoading ? (
-              <SkeletonRows count={2} className="h-48" />
-            ) : meetings.length === 0 ? (
+            {meetings.length === 0 ? (
               <PanelMessage>Your classes don&apos;t have meeting times yet.</PanelMessage>
             ) : (
               <>

@@ -41,7 +41,7 @@ interface ExamItem {
 // results arrive status-only until graded, so a submitted-but-ungraded
 // attempt reads as "Awaiting results", never as a score.
 
-const glyphs = {
+export const examGlyphs = {
   target: (
     <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
       <circle cx={12} cy={12} r={8.3} stroke="currentColor" strokeWidth={1.7} />
@@ -70,7 +70,7 @@ const glyphs = {
   ),
 };
 
-const TYPE_META: Record<ExamType, { label: string; section: string; hint: string; icon: React.ReactNode; tone: string }> = {
+export const TYPE_META: Record<ExamType, { label: string; section: string; hint: string; icon: React.ReactNode; tone: string }> = {
   MOCK: {
     label: 'Mock board',
     section: 'Mock Board Exams',
@@ -96,7 +96,7 @@ const TYPE_META: Record<ExamType, { label: string; section: string; hint: string
     label: 'Diagnostic',
     section: 'Diagnostic Tests',
     hint: 'Find the areas that need the most review',
-    icon: glyphs.target,
+    icon: examGlyphs.target,
     tone: 'bg-violet-50 text-violet-700',
   },
 };
@@ -146,9 +146,9 @@ function standingFor(exam: ExamItem, attempts: AttemptSummary[]): Standing {
 }
 
 const STATE_META: Record<ExamState, { label: string; chip: string; icon: React.ReactNode }> = {
-  todo: { label: 'Not started', chip: 'bg-slate-100 text-slate-700', icon: glyphs.flag },
-  'in-progress': { label: 'In progress', chip: 'bg-blue-50 text-blue-800', icon: glyphs.clock },
-  awaiting: { label: 'Awaiting results', chip: 'bg-violet-50 text-violet-800', icon: glyphs.clock },
+  todo: { label: 'Not started', chip: 'bg-slate-100 text-slate-700', icon: examGlyphs.flag },
+  'in-progress': { label: 'In progress', chip: 'bg-blue-50 text-blue-800', icon: examGlyphs.clock },
+  awaiting: { label: 'Awaiting results', chip: 'bg-violet-50 text-violet-800', icon: examGlyphs.clock },
   passed: { label: 'Passed', chip: 'bg-emerald-50 text-emerald-800', icon: icons.quiz },
   below: { label: 'Below passing', chip: 'bg-amber-50 text-amber-900', icon: icons.help },
   locked: { label: 'No attempts left', chip: 'bg-slate-100 text-slate-600', icon: icons.close },
@@ -242,17 +242,17 @@ function ExamCard({ exam, standing }: { exam: ExamItem; standing: Standing }) {
           </span>
         </li>
         <li className="inline-flex items-center gap-1.5">
-          <span className="text-slate-400">{glyphs.clock}</span>
+          <span className="text-slate-400">{examGlyphs.clock}</span>
           {exam.timeLimitMinutes ? `${exam.timeLimitMinutes} min` : 'Untimed'}
         </li>
         {questions !== undefined && (
           <li className="inline-flex items-center gap-1.5">
-            <span className="text-slate-400">{glyphs.list}</span>
+            <span className="text-slate-400">{examGlyphs.list}</span>
             {questions} {questions === 1 ? 'question' : 'questions'}
           </li>
         )}
         <li className="inline-flex items-center gap-1.5">
-          <span className="text-slate-400">{glyphs.flag}</span>
+          <span className="text-slate-400">{examGlyphs.flag}</span>
           Pass at {exam.passingScore} pts
         </li>
       </ul>
@@ -346,7 +346,7 @@ function RecentAttempts({ attempts, exams }: { attempts: AttemptSummary[]; exams
     .slice(0, 5);
 
   return (
-    <Panel title="Recent Attempts" icon={glyphs.clock}>
+    <Panel title="Recent Attempts" icon={examGlyphs.clock}>
       {recent.length === 0 ? (
         <PanelMessage>No attempts yet. Your first one will show up here.</PanelMessage>
       ) : (
@@ -457,7 +457,7 @@ export function ExamCatalog({
     <StudentShell>
       <StudentPageHero badge={icon} title={title} meta={<span>{description}</span>}>
         <HeroFigure icon={icons.exams} tone="bg-red-50 text-red-700" value={ready ? rows.length : dash} label="Available to you" />
-        <HeroFigure icon={glyphs.flag} tone="bg-blue-50 text-blue-700" value={ready ? attempted : dash} label="Attempted" />
+        <HeroFigure icon={examGlyphs.flag} tone="bg-blue-50 text-blue-700" value={ready ? attempted : dash} label="Attempted" />
         <HeroFigure icon={icons.quiz} tone="bg-emerald-50 text-emerald-700" value={ready ? passedCount : dash} label="Passed" />
         <HeroFigure
           icon={icons.progress}

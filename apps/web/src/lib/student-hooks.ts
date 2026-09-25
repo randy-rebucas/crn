@@ -239,6 +239,37 @@ export function useMyMaterials(types: MaterialType[]) {
   });
 }
 
+export interface MyClassMeeting {
+  id: string;
+  classId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface MyClass {
+  id: string;
+  name: string;
+  batchId: string;
+  status: string;
+  course: { id: string; code: string; name: string };
+  room: { name: string } | null;
+  instructor: { user: { firstName: string; lastName: string } } | null;
+  schedules: MyClassMeeting[];
+}
+
+// GET /v1/schedules/me is self-scoped server-side: non-cancelled classes in
+// every batch the caller is enrolled in, each with its weekly meetings.
+// Callers narrow to the active enrollment's batch.
+export function useMySchedule() {
+  const { user } = useAuth();
+  return useQuery<MyClass[]>({
+    queryKey: ['my-schedule'],
+    enabled: Boolean(user),
+    queryFn: async () => (await apiClient.get<MyClass[]>('/v1/schedules/me')).data,
+  });
+}
+
 export interface AttemptSummary {
   id: string;
   examId: string;

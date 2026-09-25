@@ -28,9 +28,8 @@ interface Certificate {
   program?: { name: string };
 }
 
-// GET /v1/certificates is organization-wide with no studentId filter
-// server-side (`certificates.service.findAllForOrganization`) — filtered
-// client-side to this student's own certificates.
+// GET /v1/certificates/me is self-scoped server-side: only the caller's own
+// certificates, newest first.
 //
 // A certificate is only ever issued against a COMPLETED enrollment, so the
 // "path" below is derived from the student's real enrollment statuses: it
@@ -345,14 +344,9 @@ export default function StudentCertificatesPage() {
   const enrollments = useMyEnrollments();
 
   const certificates = useQuery<Certificate[]>({
-    queryKey: ['my-certificates', profile.data?.id],
+    queryKey: ['my-certificates'],
     enabled: Boolean(profile.data),
-    queryFn: async () => {
-      const { data } = await apiClient.get<Certificate[]>('/v1/certificates');
-      return data
-        .filter((c) => c.studentId === profile.data!.id)
-        .sort((a, b) => (a.issuedAt < b.issuedAt ? 1 : -1));
-    },
+    queryFn: async () => (await apiClient.get<Certificate[]>('/v1/certificates/me')).data,
   });
 
   // A user with no student profile can't have certificates or enrollments;

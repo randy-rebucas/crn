@@ -52,11 +52,34 @@ export class ExamsService {
       : true;
     if (canSeeAnswers) return exam;
 
+    // A student may read the questions only once they've started an attempt
+    // on this exam; before that they get the exam's shape (format,
+    // difficulty, topic, points) so the overview can describe it without
+    // letting them study the actual items ahead of time. Graders keep full
+    // question text for review.
+    const canGrade = user!.permissions.some((p) => p.key === 'exams.grade');
+    const hasAttempt =
+      canGrade ||
+      (await this.prisma.attempt.count({
+        where: { examId: exam.id, student: { userId: user!.id, organizationId } },
+      })) > 0;
+
     return {
       ...exam,
       questions: exam.questions.map((eq) => ({
         ...eq,
-        question: { ...eq.question, correctAnswer: undefined, explanation: null },
+        question: hasAttempt
+          ? { ...eq.question, correctAnswer: undefined, explanation: null }
+          : {
+              id: eq.question.id,
+              type: eq.question.type,
+              difficulty: eq.question.difficulty,
+              topic: eq.question.topic,
+              content: null,
+              options: null,
+              correctAnswer: undefined,
+              explanation: null,
+            },
       })),
     };
   }

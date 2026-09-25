@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { formatTime } from '@/lib/instructor-schedule';
@@ -25,23 +25,9 @@ import {
   useMyAttempts,
   useMyEnrollments,
   useMyNotifications,
+  useMySchedule,
   useMyStudentProfile,
 } from '@/lib/student-hooks';
-
-interface ClassRecord {
-  id: string;
-  name: string;
-  batchId: string;
-  course: { name: string; code: string };
-}
-
-interface Schedule {
-  id: string;
-  classId: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-}
 
 interface TodaysClass {
   scheduleId: string;
@@ -664,48 +650,36 @@ function AnnouncementsPanel({
 // Page
 // ---------------------------------------------------------------------------
 
-// GAP: same as schedule/page.tsx — `GET /v1/classes` has no batchId filter,
-// so we fetch every class in the org and narrow to the active batch
-// client-side, then fan out a schedules request per class to find today's
-// meetings. A `GET /v1/schedules?batchId=` (or a combined "my schedule today"
-// endpoint) would remove the fan-out.
 export default function StudentHomePage() {
   const [now] = useState(() => new Date());
   const profile = useMyStudentProfile();
   const enrollments = useMyEnrollments();
   const notifications = useMyNotifications();
   const attempts = useMyAttempts();
+  const schedule = useMySchedule();
   const active = pickActiveEnrollment(enrollments.data);
   const batchId = active?.batchId ?? undefined;
 
-  const todaysClasses = useQuery<TodaysClass[]>({
-    queryKey: ['home-todays-classes', batchId],
-    enabled: Boolean(batchId),
-    queryFn: async () => {
-      const { data: classes } = await apiClient.get<ClassRecord[]>('/v1/classes');
-      const mine = classes.filter((c) => c.batchId === batchId);
-      const today = new Date().getDay();
-
-      const perClass = await Promise.all(
-        mine.map(async (cls) => {
-          const { data: schedules } = await apiClient.get<Schedule[]>('/v1/schedules', {
-            params: { classId: cls.id },
-          });
-          return schedules
-            .filter((s) => s.dayOfWeek === today)
+  // Today's meetings in the active batch, from the self-scoped
+  // GET /v1/schedules/me (shared with the Schedule page's cache).
+  const todaysClasses = useMemo<TodaysClass[] | undefined>(
+    () =>
+      schedule.data
+        ?.filter((cls) => cls.batchId === batchId)
+        .flatMap((cls) =>
+          cls.schedules
+            .filter((s) => s.dayOfWeek === now.getDay())
             .map((s) => ({
               scheduleId: s.id,
               className: cls.name,
               courseName: cls.course.name,
               startTime: s.startTime,
               endTime: s.endTime,
-            }));
-        }),
-      );
-
-      return perClass.flat().sort((a, b) => (a.startTime < b.startTime ? -1 : 1));
-    },
-  });
+            })),
+        )
+        .sort((a, b) => (a.startTime < b.startTime ? -1 : 1)),
+    [schedule.data, batchId, now],
+  );
 
   // Same available-to-take framing as exams/page.tsx: exams for the active
   // program. No due-date data exists server-side, so this reads as "open
@@ -739,10 +713,10 @@ export default function StudentHomePage() {
     .slice(0, 4);
 
   const examCount = exams.data?.length ?? 0;
-  const classCount = todaysClasses.data?.length ?? 0;
+  const classCount = todaysClasses?.length ?? 0;
 
   const summaryParts: string[] = [];
-  if (batchId && todaysClasses.data) {
+  if (batchId && todaysClasses) {
     summaryParts.push(classCount === 0 ? 'No classes on your schedule today' : `You have ${plural(classCount, 'class')} today`);
   }
   if (active && exams.data && examCount > 0) {
@@ -798,9 +772,9 @@ export default function StudentHomePage() {
           <TodayPanel
             now={now}
             hasBatch={Boolean(batchId) || isLoading}
-            items={todaysClasses.data ?? []}
-            loading={isLoading || todaysClasses.isLoading}
-            error={todaysClasses.isError}
+            items={todaysClasses ?? []}
+            loading={isLoading || schedule.isLoading}
+            error={schedule.isError}
           />
           <ExamsPanel
             hasEnrollment={Boolean(active) || isLoading}
