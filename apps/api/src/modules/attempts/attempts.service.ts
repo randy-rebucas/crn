@@ -8,6 +8,8 @@ import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { gradeResponse } from './grading.js';
 import type { SubmitAttemptDto } from './dto/submit-attempt.dto.js';
 
+const SUBMIT_GRACE_MS = 2 * 60_000;
+
 @Injectable()
 export class AttemptsService {
   constructor(
@@ -173,6 +175,36 @@ export class AttemptsService {
     }
     if (attempt.status !== AttemptStatus.IN_PROGRESS) {
       throw new BadRequestException('Attempt has already been submitted');
+    }
+
+    // The student app auto-submits when the timer reaches zero; the grace
+    // window absorbs a slow connection. Anything later is refused, and the
+    // attempt is closed with no answers so it can't be left open forever.
+    if (attempt.exam.timeLimitMinutes) {
+      const deadline = attempt.startedAt.getTime() + attempt.exam.timeLimitMinutes * 60_000 + SUBMIT_GRACE_MS;
+      if (Date.now() > deadline) {
+        const maxScore = attempt.exam.questions.reduce((sum, eq) => sum + eq.points, 0);
+        const expired = await this.prisma.attempt.update({
+          where: { id: attemptId },
+          data: {
+            status: AttemptStatus.GRADED,
+            submittedAt: new Date(),
+            gradedAt: new Date(),
+            score: 0,
+            maxScore,
+            passed: false,
+          },
+        });
+        await this.audit.log({
+          organizationId,
+          actorId: userId,
+          action: 'attempt.expired',
+          resource: 'attempt',
+          resourceId: attemptId,
+          afterState: expired,
+        });
+        throw new BadRequestException('The time limit for this attempt has passed, so these answers could not be accepted.');
+      }
     }
 
     const examQuestionByQuestionId = new Map(
