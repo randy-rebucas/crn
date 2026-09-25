@@ -3,6 +3,7 @@ import { ContentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { publishedOnlyWhere } from '../../common/authz/content-visibility.js';
+import { accessibleProgramIds, examProgramWhere } from '../../common/authz/program-access.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateExamDto } from './dto/create-exam.dto.js';
 import type { AddExamQuestionDto } from './dto/add-exam-question.dto.js';
@@ -14,9 +15,14 @@ export class ExamsService {
     private readonly audit: AuditService,
   ) {}
 
-  findAllForOrganization(user: AuthenticatedUser) {
+  async findAllForOrganization(user: AuthenticatedUser) {
+    const programIds = await accessibleProgramIds(this.prisma, user, 'exams.view');
     return this.prisma.exam.findMany({
-      where: { organizationId: user.organizationId, ...publishedOnlyWhere(user, 'exams.create') },
+      where: {
+        organizationId: user.organizationId,
+        ...publishedOnlyWhere(user, 'exams.create'),
+        ...examProgramWhere(programIds),
+      },
       // Counts + program name let the exam list show readiness without a
       // detail request per row.
       include: {
@@ -37,11 +43,13 @@ export class ExamsService {
   // receive the answer key here. Same leak class as the question-bank
   // endpoint, different route.
   async findOne(organizationId: string, id: string, user?: AuthenticatedUser) {
+    const programIds = user ? await accessibleProgramIds(this.prisma, user, 'exams.view') : null;
     const exam = await this.prisma.exam.findFirst({
       where: {
         id,
         organizationId,
         ...(user ? publishedOnlyWhere(user, 'exams.create') : {}),
+        ...examProgramWhere(programIds),
       },
       include: { questions: { include: { question: true }, orderBy: { position: 'asc' } } },
     });

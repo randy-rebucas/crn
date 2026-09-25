@@ -42,7 +42,7 @@ export class AttemptsController {
   @Post()
   @RequirePermissions('exams.view')
   start(@CurrentUser() user: AuthenticatedUser, @Body() dto: StartAttemptDto) {
-    return this.attempts.start(user.organizationId, user.id, dto.examId);
+    return this.attempts.start(user, dto.examId);
   }
 
   @Post(':id/submit')

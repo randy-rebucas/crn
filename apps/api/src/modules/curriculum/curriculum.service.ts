@@ -1,8 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ContentStatus, EnrollmentStatus, MaterialType } from '@prisma/client';
+import { ContentStatus, MaterialType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { publishedOnlyWhere } from '../../common/authz/content-visibility.js';
+import {
+  PROGRAM_ACCESS_ENROLLMENT_STATUSES,
+  accessibleProgramIds,
+  programWhere,
+} from '../../common/authz/program-access.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateModuleDto } from './dto/create-module.dto.js';
 import type { CreateLessonDto } from './dto/create-lesson.dto.js';
@@ -18,17 +23,6 @@ const ALLOWED_CONTENT_TRANSITIONS: Record<ContentStatus, ContentStatus[]> = {
   ARCHIVED: [],
 };
 
-// Enrollments that grant access to a program's study library — the same
-// set the student portal treats as "active", plus COMPLETED so graduates
-// keep their materials.
-const LIBRARY_ENROLLMENT_STATUSES: EnrollmentStatus[] = [
-  EnrollmentStatus.APPROVED,
-  EnrollmentStatus.PAYMENT_PENDING,
-  EnrollmentStatus.PAYMENT_VERIFIED,
-  EnrollmentStatus.ENROLLED,
-  EnrollmentStatus.COMPLETED,
-];
-
 export const MATERIAL_TYPES = Object.values(MaterialType);
 
 @Injectable()
@@ -40,11 +34,12 @@ export class CurriculumService {
 
   // --- Modules -------------------------------------------------------------
 
-  findModulesForSubject(user: AuthenticatedUser, subjectId: string) {
+  async findModulesForSubject(user: AuthenticatedUser, subjectId: string) {
+    const programIds = await accessibleProgramIds(this.prisma, user, 'courses.view');
     return this.prisma.module.findMany({
       where: {
         subjectId,
-        subject: { course: { program: { organizationId: user.organizationId } } },
+        subject: { course: { program: programWhere(user.organizationId, programIds) } },
         ...publishedOnlyWhere(user, 'courses.update'),
       },
       orderBy: { position: 'asc' },
@@ -74,11 +69,12 @@ export class CurriculumService {
 
   // --- Lessons ---------------------------------------------------------------
 
-  findLessonsForModule(user: AuthenticatedUser, moduleId: string) {
+  async findLessonsForModule(user: AuthenticatedUser, moduleId: string) {
+    const programIds = await accessibleProgramIds(this.prisma, user, 'courses.view');
     return this.prisma.lesson.findMany({
       where: {
         moduleId,
-        module: { subject: { course: { program: { organizationId: user.organizationId } } } },
+        module: { subject: { course: { program: programWhere(user.organizationId, programIds) } } },
         ...publishedOnlyWhere(user, 'courses.update'),
       },
       orderBy: { position: 'asc' },
@@ -108,11 +104,12 @@ export class CurriculumService {
 
   // --- Materials -------------------------------------------------------------
 
-  findMaterialsForLesson(user: AuthenticatedUser, lessonId: string) {
+  async findMaterialsForLesson(user: AuthenticatedUser, lessonId: string) {
+    const programIds = await accessibleProgramIds(this.prisma, user, 'courses.view');
     return this.prisma.material.findMany({
       where: {
         lessonId,
-        lesson: { module: { subject: { course: { program: { organizationId: user.organizationId } } } } },
+        lesson: { module: { subject: { course: { program: programWhere(user.organizationId, programIds) } } } },
         ...publishedOnlyWhere(user, 'courses.update'),
       },
       orderBy: { position: 'asc' },
@@ -132,7 +129,7 @@ export class CurriculumService {
     if (!profile) return [];
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { studentId: profile.id, status: { in: LIBRARY_ENROLLMENT_STATUSES } },
+      where: { studentId: profile.id, status: { in: PROGRAM_ACCESS_ENROLLMENT_STATUSES } },
       select: { programId: true },
     });
     const programIds = [...new Set(enrollments.map((e) => e.programId))];

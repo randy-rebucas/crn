@@ -289,7 +289,7 @@ function StandingPanel({
         <div className="min-w-0">
           <p className="text-base font-semibold text-slate-900">Average score</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            {gradedCount === 0 ? 'Appears after your first graded exam' : `Across ${plural(gradedCount, 'graded exam')}`}
+            {gradedCount === 0 ? 'Appears after your first graded exam' : `Across ${plural(gradedCount, 'graded attempt')}`}
           </p>
           <p className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-red-700">
             See performance

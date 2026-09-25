@@ -201,7 +201,7 @@ function Countdown({ deadline, onExpire }: { deadline: number; onExpire: () => v
     <span
       className={`inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold tabular-nums ${tone}`}
       role="timer"
-      aria-label={left === 0 ? 'Time is up' : `${m + h * 60} minutes left`}
+      aria-label={left === 0 ? 'Time is up' : left < 60 ? `${left} seconds left` : `${Math.ceil(left / 60)} minutes left`}
     >
       {examGlyphs.clock}
       {left === 0 ? "Time's up" : text}
@@ -626,6 +626,14 @@ function ResultView({
   startedAt: string | null;
 }) {
   const [filter, setFilter] = useState<Outcome | 'all'>('all');
+  // A jump to a question the filter is hiding clears the filter first, then
+  // scrolls once the question is back in the list.
+  const jumpTo = useRef<number | null>(null);
+  useEffect(() => {
+    if (jumpTo.current === null) return;
+    document.getElementById(`review-${jumpTo.current}`)?.scrollIntoView({ block: 'start' });
+    jumpTo.current = null;
+  }, [filter]);
   const type = TYPE_META[exam.type] ?? TYPE_META.PRACTICE;
   const totalPoints = attempt.maxScore ?? exam.questions.reduce((s, q) => s + q.points, 0);
   const passPct = Math.min(100, pctOf(exam.passingScore, totalPoints));
@@ -642,7 +650,7 @@ function ResultView({
   }, [attempt.answers, exam.questions, hasReview]);
 
   const counts = Object.fromEntries(OUTCOME_ORDER.map((o) => [o, rows.filter((r) => r.outcome === o).length])) as Record<Outcome, number>;
-  const correctCount = counts.correct + counts.partial;
+  const correctCount = counts.correct;
   const pct = graded ? pctOf(attempt.score!, totalPoints) : null;
   const passed = Boolean(attempt.passed);
   const submittedAt = attempt.submittedAt ?? null;
@@ -711,7 +719,7 @@ function ResultView({
               dash
             )
           }
-          label="Questions correct"
+          label={counts.partial > 0 ? `Questions correct · ${counts.partial} partial` : 'Questions correct'}
         />
         <HeroFigure
           icon={examGlyphs.clock}
@@ -805,7 +813,12 @@ function ResultView({
                   <li key={r.n}>
                     <a
                       href={`#review-${r.n}`}
-                      onClick={() => setFilter('all')}
+                      onClick={(e) => {
+                        if (filter === 'all' || r.outcome === filter) return;
+                        e.preventDefault();
+                        jumpTo.current = r.n;
+                        setFilter('all');
+                      }}
                       aria-label={`Question ${r.n}: ${OUTCOME[r.outcome].label}`}
                       className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold tabular-nums transition hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${OUTCOME[r.outcome].tile}`}
                     >

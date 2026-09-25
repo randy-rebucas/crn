@@ -3,6 +3,7 @@ import { AttemptStatus, ContentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { attemptScopeWhere, getScope } from '../../common/authz/scope.js';
+import { accessibleProgramIds, examProgramWhere } from '../../common/authz/program-access.js';
 import { SAFE_USER_SELECT } from '../../common/prisma/safe-selects.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { gradeResponse } from './grading.js';
@@ -193,10 +194,16 @@ export class AttemptsService {
     return { ...attempt, ...timing };
   }
 
-  async start(organizationId: string, userId: string, examId: string) {
+  async start(user: AuthenticatedUser, examId: string) {
+    const { organizationId, id: userId } = user;
     const student = await this.requireStudentProfile(organizationId, userId);
 
-    const exam = await this.prisma.exam.findFirst({ where: { id: examId, organizationId } });
+    // Same program rule as listing exams: a student can't start another
+    // program's exam by id.
+    const programIds = await accessibleProgramIds(this.prisma, user, 'exams.view');
+    const exam = await this.prisma.exam.findFirst({
+      where: { id: examId, organizationId, ...examProgramWhere(programIds) },
+    });
     if (!exam) throw new NotFoundException('Exam not found');
     if (exam.status !== ContentStatus.PUBLISHED) {
       throw new BadRequestException('Exam is not published');

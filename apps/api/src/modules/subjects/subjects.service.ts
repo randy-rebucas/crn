@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { publishedOnlyWhere } from '../../common/authz/content-visibility.js';
+import { accessibleProgramIds, programWhere } from '../../common/authz/program-access.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateSubjectDto } from './dto/create-subject.dto.js';
 
@@ -12,11 +13,12 @@ export class SubjectsService {
     private readonly audit: AuditService,
   ) {}
 
-  findAllForCourse(user: AuthenticatedUser, courseId: string) {
+  async findAllForCourse(user: AuthenticatedUser, courseId: string) {
+    const programIds = await accessibleProgramIds(this.prisma, user, 'courses.view');
     return this.prisma.subject.findMany({
       where: {
         courseId,
-        course: { program: { organizationId: user.organizationId } },
+        course: { program: programWhere(user.organizationId, programIds) },
         ...publishedOnlyWhere(user, 'courses.update'),
       },
       orderBy: { createdAt: 'desc' },

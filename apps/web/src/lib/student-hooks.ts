@@ -156,15 +156,19 @@ export function useChangePassword() {
   });
 }
 
-const ACTIVE_ENROLLMENT_PRIORITY = ['ENROLLED', 'PAYMENT_VERIFIED', 'PAYMENT_PENDING', 'APPROVED'];
+// Most-live first, then COMPLETED so graduates still land on their program.
+// Matches the statuses the API grants program access for
+// (PROGRAM_ACCESS_ENROLLMENT_STATUSES); anything else — an application still
+// under review, a cancelled or rejected one — is never treated as current.
+const ACTIVE_ENROLLMENT_PRIORITY = ['ENROLLED', 'PAYMENT_VERIFIED', 'PAYMENT_PENDING', 'APPROVED', 'COMPLETED'];
 
 export function pickActiveEnrollment(enrollments: Enrollment[] | undefined): Enrollment | null {
-  if (!enrollments || enrollments.length === 0) return null;
+  if (!enrollments) return null;
   for (const status of ACTIVE_ENROLLMENT_PRIORITY) {
     const match = enrollments.find((e) => e.status === status);
     if (match) return match;
   }
-  return enrollments[0];
+  return null;
 }
 
 export interface Notification {
