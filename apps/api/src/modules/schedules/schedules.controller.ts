@@ -12,6 +12,12 @@ import { CreateScheduleDto } from './dto/create-schedule.dto.js';
 export class SchedulesController {
   constructor(private readonly schedules: SchedulesService) {}
 
+  // No permission key: self-scoped in the service (see findMine).
+  @Get('me')
+  findMine(@CurrentUser() user: AuthenticatedUser) {
+    return this.schedules.findMine(user.organizationId, user.id);
+  }
+
   @Get()
   @RequirePermissions('schedules.view')
   findAll(@CurrentUser() user: AuthenticatedUser, @Query('classId') classId: string) {

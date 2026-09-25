@@ -15,6 +15,36 @@ export class SchedulesService {
     private readonly audit: AuditService,
   ) {}
 
+  // The caller's own timetable: every non-cancelled class in a batch they're
+  // enrolled in, with its weekly meetings. Resolved from the caller's
+  // student profile, never from input, so it needs no view permission of
+  // its own (students hold neither classes.view nor schedules.view).
+  async findMine(organizationId: string, userId: string) {
+    const student = await this.prisma.studentProfile.findFirst({ where: { userId, organizationId } });
+    if (!student) return [];
+    return this.prisma.class.findMany({
+      where: {
+        status: { not: 'CANCELLED' },
+        branch: { organizationId },
+        batch: { enrollments: { some: { studentId: student.id } } },
+      },
+      select: {
+        id: true,
+        name: true,
+        batchId: true,
+        status: true,
+        course: { select: { id: true, code: true, name: true } },
+        room: { select: { name: true } },
+        instructor: { select: { user: { select: { firstName: true, lastName: true } } } },
+        schedules: {
+          select: { id: true, classId: true, dayOfWeek: true, startTime: true, endTime: true },
+          orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   findAllForClass(organizationId: string, classId: string) {
     return this.prisma.schedule.findMany({
       where: { classId, class: { branch: { organizationId } } },

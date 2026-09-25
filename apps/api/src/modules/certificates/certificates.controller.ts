@@ -18,6 +18,13 @@ export class CertificatesController {
     return this.certificates.verify(qrToken);
   }
 
+  // Signed-in only, no permission key: self-scoped in the service.
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  findMine(@CurrentUser() user: AuthenticatedUser) {
+    return this.certificates.findMine(user);
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('certificates.view')

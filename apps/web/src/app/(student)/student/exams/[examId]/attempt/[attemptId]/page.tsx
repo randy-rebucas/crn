@@ -66,7 +66,9 @@ interface AttemptAnswer {
 }
 
 // A delayed-release attempt that isn't graded yet arrives as
-// { id, status, submittedAt } only, so everything else is optional.
+// { id, status, startedAt, submittedAt } only, so everything else is
+// optional. An in-progress attempt also carries the server's `deadline`
+// (null when untimed) and clock (`serverNow`); `receivedAt` is stamped here.
 interface AttemptResult {
   id: string;
   status: string;
@@ -77,6 +79,9 @@ interface AttemptResult {
   submittedAt?: string | null;
   gradedAt?: string | null;
   answers?: AttemptAnswer[];
+  deadline?: string | null;
+  serverNow?: string;
+  receivedAt: number;
 }
 
 type ExamQuestion = ExamFull['questions'][number];
@@ -85,6 +90,15 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 function draftKey(attemptId: string) {
   return `obias:attempt-draft:${attemptId}`;
+}
+
+// The server's deadline moved onto this device's clock. Counting down from
+// the device clock alone breaks when it's minutes off: the server refuses
+// answers past its own deadline plus a short grace.
+function localDeadline(a: AttemptResult) {
+  if (!a.deadline || !a.serverNow) return null;
+  const skew = new Date(a.serverNow).getTime() - a.receivedAt;
+  return new Date(a.deadline).getTime() - skew;
 }
 
 function isAnswered(value: unknown) {
@@ -103,7 +117,7 @@ export default function AttemptPage() {
   });
   const attempt = useQuery<AttemptResult>({
     queryKey: ['attempt', params.attemptId],
-    queryFn: async () => (await apiClient.get(`/v1/attempts/${params.attemptId}`)).data,
+    queryFn: async () => ({ ...(await apiClient.get(`/v1/attempts/${params.attemptId}`)).data, receivedAt: Date.now() }),
   });
   const myAttempts = useMyAttempts();
 
@@ -145,7 +159,7 @@ export default function AttemptPage() {
       attemptId={params.attemptId}
       examHref={examHref}
       attemptNumber={summary?.n ?? null}
-      startedAt={attempt.data.startedAt ?? summary?.startedAt ?? null}
+      deadline={localDeadline(attempt.data)}
     />
   ) : (
     <ResultView
@@ -200,13 +214,13 @@ function TakeView({
   attemptId,
   examHref,
   attemptNumber,
-  startedAt,
+  deadline,
 }: {
   exam: ExamFull;
   attemptId: string;
   examHref: string;
   attemptNumber: number | null;
-  startedAt: string | null;
+  deadline: number | null;
 }) {
   const queryClient = useQueryClient();
   // Answers live only in this tab until submit, so keep a draft per attempt:
@@ -274,7 +288,6 @@ function TakeView({
   const answeredCount = exam.questions.filter((q) => isAnswered(answers[q.questionId])).length;
   const unanswered = total - answeredCount;
   const totalPoints = exam.questions.reduce((s, q) => s + q.points, 0);
-  const deadline = exam.timeLimitMinutes && startedAt ? new Date(startedAt).getTime() + exam.timeLimitMinutes * 60000 : null;
 
   const onSubmit = () => {
     if (unanswered > 0 && !confirming) {
@@ -641,6 +654,14 @@ function ResultView({
     : { label: 'Awaiting results', chip: 'bg-violet-50 text-violet-800', badge: 'bg-violet-600 text-white', icon: kitGlyphs.hourglass };
 
   const dash = <span className="text-slate-300">—</span>;
+  // The server closes an attempt with no answers once its time limit (plus a
+  // short grace) passes without a submit.
+  const timedOut =
+    exam.timeLimitMinutes !== null &&
+    attempt.answers?.length === 0 &&
+    startedAt !== null &&
+    submittedAt !== null &&
+    new Date(submittedAt).getTime() - new Date(startedAt).getTime() > exam.timeLimitMinutes * 60_000;
 
   return (
     <StudentShell>
@@ -699,6 +720,15 @@ function ResultView({
           label={exam.timeLimitMinutes ? `Time taken · limit ${exam.timeLimitMinutes} min` : 'Time taken'}
         />
       </StudentPageHero>
+
+      {timedOut && (
+        <p className="mb-5 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-sm leading-relaxed text-amber-900" role="status">
+          <span className="mt-0.5 shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden>
+            {examGlyphs.clock}
+          </span>
+          Time ran out before this attempt was submitted, so it was closed with no answers recorded.
+        </p>
+      )}
 
       {!hasReview && (
         <Panel title="Grading in Progress" icon={kitGlyphs.hourglass}>

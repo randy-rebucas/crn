@@ -10,6 +10,17 @@ import type { SubmitAttemptDto } from './dto/submit-attempt.dto.js';
 
 const SUBMIT_GRACE_MS = 2 * 60_000;
 
+function deadlineOf(startedAt: Date, timeLimitMinutes: number | null) {
+  return timeLimitMinutes ? new Date(startedAt.getTime() + timeLimitMinutes * 60_000) : null;
+}
+
+// Past the deadline plus the grace window, an in-progress attempt can no
+// longer be submitted.
+function isOverdue(attempt: { status: AttemptStatus; startedAt: Date }, timeLimitMinutes: number | null, now = Date.now()) {
+  const deadline = deadlineOf(attempt.startedAt, timeLimitMinutes);
+  return attempt.status === AttemptStatus.IN_PROGRESS && deadline !== null && now > deadline.getTime() + SUBMIT_GRACE_MS;
+}
+
 @Injectable()
 export class AttemptsService {
   constructor(
@@ -21,6 +32,34 @@ export class AttemptsService {
     const student = await this.prisma.studentProfile.findFirst({ where: { userId, organizationId } });
     if (!student) throw new NotFoundException('No student profile for this account');
     return student;
+  }
+
+  // Closes an overdue attempt as graded with no answers, so it can't sit
+  // "in progress" forever, offering a Resume that can only fail. Guarded on
+  // IN_PROGRESS so a submit that lands at the same moment wins cleanly.
+  private async closeExpired(organizationId: string, actorId: string, attemptId: string, examId: string) {
+    const { _sum } = await this.prisma.examQuestion.aggregate({ where: { examId }, _sum: { points: true } });
+    const now = new Date();
+    const { count } = await this.prisma.attempt.updateMany({
+      where: { id: attemptId, status: AttemptStatus.IN_PROGRESS },
+      data: {
+        status: AttemptStatus.GRADED,
+        submittedAt: now,
+        gradedAt: now,
+        score: 0,
+        maxScore: _sum.points ?? 0,
+        passed: false,
+      },
+    });
+    if (count === 0) return;
+    await this.audit.log({
+      organizationId,
+      actorId,
+      action: 'attempt.expired',
+      resource: 'attempt',
+      resourceId: attemptId,
+      afterState: { status: AttemptStatus.GRADED, score: 0, passed: false },
+    });
   }
 
   // `exams.grade` can be granted at ASSIGNED scope (an instructor's own
@@ -60,11 +99,21 @@ export class AttemptsService {
   async findAllForCurrentStudent(organizationId: string, userId: string) {
     const student = await this.requireStudentProfile(organizationId, userId);
 
-    const attempts = await this.prisma.attempt.findMany({
-      where: { studentId: student.id, exam: { organizationId } },
-      include: { exam: { select: { id: true, title: true, resultRelease: true, passingScore: true } } },
-      orderBy: { startedAt: 'desc' },
-    });
+    const load = () =>
+      this.prisma.attempt.findMany({
+        where: { studentId: student.id, exam: { organizationId } },
+        include: {
+          exam: { select: { id: true, title: true, resultRelease: true, passingScore: true, timeLimitMinutes: true } },
+        },
+        orderBy: { startedAt: 'desc' },
+      });
+
+    let attempts = await load();
+    const overdue = attempts.filter((a) => isOverdue(a, a.exam.timeLimitMinutes));
+    if (overdue.length > 0) {
+      for (const a of overdue) await this.closeExpired(organizationId, userId, a.id, a.examId);
+      attempts = await load();
+    }
 
     return attempts.map((attempt) => {
       if (attempt.exam.resultRelease === 'DELAYED' && attempt.status !== AttemptStatus.GRADED) {
@@ -116,18 +165,32 @@ export class AttemptsService {
   // Applies the exam's result-release policy: a student polling their own
   // delayed-release attempt sees status only, never the score or answers,
   // until an instructor has finished grading it (blueprint Section 15).
+  //
+  // An in-progress attempt also carries its `deadline` and the server's
+  // clock (`serverNow`), so the student app counts down against server time
+  // rather than a device clock that may be minutes off.
   async findResultForStudent(organizationId: string, userId: string, id: string) {
     const student = await this.requireStudentProfile(organizationId, userId);
-    const attempt = await this.findOne(organizationId, id);
+    let attempt = await this.findOne(organizationId, id);
     if (attempt.studentId !== student.id) {
       throw new ForbiddenException('This attempt does not belong to you');
     }
 
-    if (attempt.exam.resultRelease === 'DELAYED' && attempt.status !== AttemptStatus.GRADED) {
-      return { id: attempt.id, status: attempt.status, submittedAt: attempt.submittedAt };
+    if (isOverdue(attempt, attempt.exam.timeLimitMinutes)) {
+      await this.closeExpired(organizationId, userId, attempt.id, attempt.examId);
+      attempt = await this.findOne(organizationId, id);
     }
 
-    return attempt;
+    const timing =
+      attempt.status === AttemptStatus.IN_PROGRESS
+        ? { deadline: deadlineOf(attempt.startedAt, attempt.exam.timeLimitMinutes), serverNow: new Date() }
+        : {};
+
+    if (attempt.exam.resultRelease === 'DELAYED' && attempt.status !== AttemptStatus.GRADED) {
+      return { id: attempt.id, status: attempt.status, startedAt: attempt.startedAt, submittedAt: attempt.submittedAt, ...timing };
+    }
+
+    return { ...attempt, ...timing };
   }
 
   async start(organizationId: string, userId: string, examId: string) {
@@ -180,31 +243,9 @@ export class AttemptsService {
     // The student app auto-submits when the timer reaches zero; the grace
     // window absorbs a slow connection. Anything later is refused, and the
     // attempt is closed with no answers so it can't be left open forever.
-    if (attempt.exam.timeLimitMinutes) {
-      const deadline = attempt.startedAt.getTime() + attempt.exam.timeLimitMinutes * 60_000 + SUBMIT_GRACE_MS;
-      if (Date.now() > deadline) {
-        const maxScore = attempt.exam.questions.reduce((sum, eq) => sum + eq.points, 0);
-        const expired = await this.prisma.attempt.update({
-          where: { id: attemptId },
-          data: {
-            status: AttemptStatus.GRADED,
-            submittedAt: new Date(),
-            gradedAt: new Date(),
-            score: 0,
-            maxScore,
-            passed: false,
-          },
-        });
-        await this.audit.log({
-          organizationId,
-          actorId: userId,
-          action: 'attempt.expired',
-          resource: 'attempt',
-          resourceId: attemptId,
-          afterState: expired,
-        });
-        throw new BadRequestException('The time limit for this attempt has passed, so these answers could not be accepted.');
-      }
+    if (isOverdue(attempt, attempt.exam.timeLimitMinutes)) {
+      await this.closeExpired(organizationId, userId, attemptId, attempt.examId);
+      throw new BadRequestException('The time limit for this attempt has passed, so these answers could not be accepted.');
     }
 
     const examQuestionByQuestionId = new Map(
