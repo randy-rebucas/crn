@@ -3,6 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { API_BASE_URL } from '@/lib/api-client';
+import { PUBLIC_SETTINGS_FALLBACK, phonesOf, withFallbacks, type PublicSettings } from '@/lib/public-settings';
 
 const NAV_ITEMS = [
   { label: 'About', href: '/about' },
@@ -36,6 +39,17 @@ function Logo() {
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Contact block comes from Settings; the fallback keeps it filled while
+  // loading or if the API is down.
+  const { data: contact = PUBLIC_SETTINGS_FALLBACK } = useQuery<PublicSettings>({
+    queryKey: ['public', 'settings'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE_URL}/v1/public/settings`);
+      if (!res.ok) throw new Error('settings unavailable');
+      return withFallbacks(await res.json());
+    },
+    staleTime: 5 * 60_000,
+  });
 
   return (
     <div className="flex flex-1 flex-col">
@@ -107,10 +121,13 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               Have questions about enrollment or our programs? Reach us any of these ways.
             </p>
             <ul className="mt-6 space-y-3 text-base font-semibold text-white">
-              <li>0917 165 4780</li>
-              <li>0939 126 2602</li>
-              <li>0951 562 4048</li>
-              <li>0923 812 2649</li>
+              {phonesOf(contact).map((phone) => (
+                <li key={phone}>
+                  <a href={`tel:${phone.replace(/\s+/g, '')}`} className="transition-colors hover:text-brand-gold">
+                    {phone}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -128,26 +145,40 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="rounded-xl border border-white/10 bg-brand-navy-light p-6">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 text-brand-gold" aria-hidden="true">
-                &#128205;
-              </span>
-              <p className="text-sm text-slate-200">
-                Jinyang Bldg. #1, Manila Doctors Access Road, Almanza Uno, Las Piñas City
-              </p>
-            </div>
-            <div className="mt-3 flex items-start gap-3">
-              <span className="mt-0.5 text-brand-gold" aria-hidden="true">
-                &#9993;
-              </span>
-              <p className="text-sm text-slate-200">centerofreviewfornursing@gmail.com</p>
-            </div>
-            <div className="mt-3 flex items-start gap-3">
-              <span className="mt-0.5 text-brand-gold" aria-hidden="true">
-                &#128260;
-              </span>
-              <p className="text-sm text-slate-200">Facebook: Obias Nursing &amp; Allied Courses Review Center</p>
-            </div>
+            {contact.address && (
+              <div className="flex items-start gap-3">
+                <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" aria-hidden="true">
+                  <path d="M12 21s7-6.4 7-11.5A7 7 0 0 0 5 9.5C5 14.6 12 21 12 21Z" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round" />
+                  <circle cx={12} cy={9.5} r={2.4} stroke="currentColor" strokeWidth={1.8} />
+                </svg>
+                <p className="text-sm text-slate-200">{contact.address}</p>
+              </div>
+            )}
+            {contact.supportEmail && (
+              <div className="mt-3 flex items-start gap-3">
+                <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" aria-hidden="true">
+                  <rect x={3.5} y={5.5} width={17} height={13} rx={2} stroke="currentColor" strokeWidth={1.8} />
+                  <path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round" />
+                </svg>
+                <a href={`mailto:${contact.supportEmail}`} className="break-all text-sm text-slate-200 hover:text-brand-gold">
+                  {contact.supportEmail}
+                </a>
+              </div>
+            )}
+            {contact.facebookPageName && (
+              <div className="mt-3 flex items-start gap-3">
+                <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" aria-hidden="true">
+                  <path d="M14 8h2.5V4.5H14A3.5 3.5 0 0 0 10.5 8v2.5H8V14h2.5v6.5H14V14h2.5l.5-3.5h-3V8Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+                </svg>
+                {contact.facebookUrl ? (
+                  <a href={contact.facebookUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-200 hover:text-brand-gold">
+                    Facebook: {contact.facebookPageName}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-200">Facebook: {contact.facebookPageName}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

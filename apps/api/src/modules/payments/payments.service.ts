@@ -7,6 +7,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { branchScopeWhere, paymentScopeWhere } from '../../common/authz/scope.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreatePaymentDto } from './dto/create-payment.dto.js';
+import { readOrgSettings } from '../settings/org-settings.js';
 
 @Injectable()
 export class PaymentsService {
@@ -94,6 +95,8 @@ export class PaymentsService {
     // check, and jointly push the invoice over its total. An interactive
     // transaction re-reads the sum inside the same transaction that writes
     // the update, closing that race.
+    const settings = await readOrgSettings(this.prisma, organizationId);
+
     const { verified, receipt } = await this.prisma.$transaction(async (tx) => {
       const alreadyVerified = await tx.payment.aggregate({
         where: { invoiceId: payment.invoiceId, status: PaymentStatus.VERIFIED },
@@ -109,7 +112,7 @@ export class PaymentsService {
         data: { status: PaymentStatus.VERIFIED, verifiedById: actorId, verifiedAt: new Date() },
       });
       const receipt = await tx.receipt.create({
-        data: { paymentId: id, receiptNumber: `RCPT-${id.slice(0, 8).toUpperCase()}` },
+        data: { paymentId: id, receiptNumber: `${settings.receiptPrefix}-${id.slice(0, 8).toUpperCase()}` },
       });
       return { verified, receipt };
     });
@@ -129,7 +132,7 @@ export class PaymentsService {
       where: { id: payment.invoice.enrollmentId },
       include: { student: { select: { userId: true } } },
     });
-    if (enrollment) {
+    if (enrollment && settings.notifyOnPaymentVerified) {
       await this.notifications.emit({
         organizationId,
         userId: enrollment.student.userId,

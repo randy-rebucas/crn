@@ -1,3 +1,5 @@
+'use client';
+
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -32,18 +34,24 @@ export function Drawer({
   title?: string;
   children: React.ReactNode;
 }) {
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(open);
   const [entered, setEntered] = useState(false);
+
+  // Mount as soon as it opens (adjusting state during render, not in an
+  // effect); the effect below only schedules the slide-in / delayed unmount.
+  if (open && !mounted) setMounted(true);
 
   useEffect(() => {
     if (open) {
-      setMounted(true);
       const raf = requestAnimationFrame(() => setEntered(true));
       return () => cancelAnimationFrame(raf);
     }
-    setEntered(false);
+    const raf = requestAnimationFrame(() => setEntered(false));
     const timeout = setTimeout(() => setMounted(false), 200);
-    return () => clearTimeout(timeout);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timeout);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -216,6 +224,7 @@ const STATUS_TONE: Record<string, keyof typeof BADGE_TONES> = {
   PENDING: 'gold',
   VERIFIED: 'green',
   ACTIVE: 'green',
+  ON_LEAVE: 'gold',
   UPCOMING: 'blue',
   REQUESTED: 'gold',
   OFFICER_APPROVED: 'blue',

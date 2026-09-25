@@ -54,6 +54,26 @@ function clearStoredRefreshToken() {
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+// Refresh tokens rotate on use, so two concurrent restores (React's dev
+// double-invoked effect, or two quick remounts) would send the same token
+// twice: the second is rejected and, left alone, its failure would wipe the
+// access token the first one just set. Every concurrent caller shares one
+// in-flight refresh instead.
+let restoreInFlight: Promise<AuthUser> | null = null;
+
+function refreshSessionOnce(refreshToken: string, rememberMe: boolean): Promise<AuthUser> {
+  restoreInFlight ??= (async () => {
+    const { data } = await apiClient.post('/v1/auth/refresh', { refreshToken });
+    setAccessToken(data.accessToken);
+    storeRefreshToken(data.refreshToken, rememberMe);
+    const { data: me } = await apiClient.get<AuthUser>('/v1/users/me');
+    return me;
+  })().finally(() => {
+    restoreInFlight = null;
+  });
+  return restoreInFlight;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   // Only start "loading" if there's actually a session to restore — this
@@ -75,14 +95,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data } = await apiClient.post('/v1/auth/refresh', { refreshToken });
-      setAccessToken(data.accessToken);
-      storeRefreshToken(data.refreshToken, rememberMe);
-      const { data: me } = await apiClient.get('/v1/users/me');
+      const me = await refreshSessionOnce(refreshToken, rememberMe);
       setUser(me);
     } catch {
-      clearStoredRefreshToken();
-      setAccessToken(null);
+      // Only tear the session down if the token that failed is still the one
+      // on file — if something else already rotated it, that session is live.
+      if (getStoredRefreshToken() === refreshToken) {
+        clearStoredRefreshToken();
+        setAccessToken(null);
+      }
     } finally {
       setIsLoading(false);
     }

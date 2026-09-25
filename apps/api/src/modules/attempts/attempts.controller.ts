@@ -28,9 +28,14 @@ export class AttemptsController {
     return this.attempts.findAllForCurrentStudent(user.organizationId, user.id);
   }
 
+  // Graders (exams.grade) get the full attempt for review; everyone else is
+  // treated as a student reading their own result, with release rules applied.
   @Get(':id')
   @RequirePermissions('exams.view')
   findResult(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    if (user.permissions.some((p) => p.key === 'exams.grade')) {
+      return this.attempts.findOneForGrader(user, id);
+    }
     return this.attempts.findResultForStudent(user.organizationId, user.id, id);
   }
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { PermissionsGuard } from '../../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator.js';
@@ -39,6 +39,16 @@ export class ExamsController {
     @Body() dto: AddExamQuestionDto,
   ) {
     return this.exams.addQuestion(user.organizationId, user.id, id, dto);
+  }
+
+  @Delete(':id/questions/:examQuestionId')
+  @RequirePermissions('exams.update')
+  removeQuestion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('examQuestionId') examQuestionId: string,
+  ) {
+    return this.exams.removeQuestion(user.organizationId, user.id, id, examQuestionId);
   }
 
   @Patch(':id/publish')

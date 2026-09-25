@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ContentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -17,6 +17,12 @@ export class ExamsService {
   findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.exam.findMany({
       where: { organizationId: user.organizationId, ...publishedOnlyWhere(user, 'exams.create') },
+      // Counts + program name let the exam list show readiness without a
+      // detail request per row.
+      include: {
+        program: { select: { id: true, name: true } },
+        _count: { select: { questions: true, attempts: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -106,6 +112,12 @@ export class ExamsService {
       throw new BadRequestException('Only approved questions can be added to an exam');
     }
 
+    const alreadyAdded = await this.prisma.examQuestion.findUnique({
+      where: { examId_questionId: { examId, questionId: dto.questionId } },
+      select: { id: true },
+    });
+    if (alreadyAdded) throw new ConflictException('That question is already on this exam');
+
     const examQuestion = await this.prisma.examQuestion.create({
       data: {
         examId,
@@ -125,6 +137,32 @@ export class ExamsService {
     });
 
     return examQuestion;
+  }
+
+  // Draft-only, same rule as addQuestion: a published exam's question set is
+  // frozen because attempts are scored against it.
+  async removeQuestion(organizationId: string, actorId: string, examId: string, examQuestionId: string) {
+    const exam = await this.prisma.exam.findFirst({ where: { id: examId, organizationId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+    if (exam.status === ContentStatus.PUBLISHED) {
+      throw new BadRequestException('Cannot remove questions from a published exam');
+    }
+
+    const examQuestion = await this.prisma.examQuestion.findFirst({ where: { id: examQuestionId, examId } });
+    if (!examQuestion) throw new NotFoundException('Question is not on this exam');
+
+    await this.prisma.examQuestion.delete({ where: { id: examQuestion.id } });
+
+    await this.audit.log({
+      organizationId,
+      actorId,
+      action: 'exam.question_removed',
+      resource: 'exam',
+      resourceId: examId,
+      beforeState: examQuestion,
+    });
+
+    return { id: examQuestion.id };
   }
 
   async publish(organizationId: string, actorId: string, id: string) {

@@ -16,6 +16,11 @@ export class NotificationsController {
     return this.notifications.findAllForUser(user.id, unreadOnly === 'true');
   }
 
+  @Patch('read-all')
+  markAllRead(@CurrentUser() user: AuthenticatedUser) {
+    return this.notifications.markAllRead(user.id);
+  }
+
   @Patch(':id/read')
   markRead(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.notifications.markRead(user.id, id);

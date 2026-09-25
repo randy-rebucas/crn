@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { LeadsService } from '../leads/leads.service.js';
 import type { CreatePublicLeadDto } from './dto/create-public-lead.dto.js';
 import type { RegisterStudentDto } from './dto/register-student.dto.js';
+import { readOrgSettings } from '../settings/org-settings.js';
 
 @Injectable()
 export class PublicService {
@@ -28,6 +29,29 @@ export class PublicService {
   // Published-only, same rule content-visibility.ts applies to authenticated
   // callers without a manage permission — an anonymous visitor is exactly
   // that caller, permanently.
+  // Contact block and enrollment status for the marketing site. An explicit
+  // allow-list: settings also hold internal values (numbering prefixes,
+  // notification switches) that anonymous visitors have no business seeing.
+  async findPublicSettings() {
+    const organizationId = await this.resolveOrganizationId();
+    const [settings, organization] = await Promise.all([
+      readOrgSettings(this.prisma, organizationId),
+      this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } }),
+    ]);
+    return {
+      organizationName: organization.name,
+      supportEmail: settings.supportEmail,
+      supportPhone: settings.supportPhone,
+      additionalPhones: settings.additionalPhones,
+      address: settings.address,
+      facebookPageName: settings.facebookPageName,
+      facebookUrl: settings.facebookUrl,
+      enrollmentOpen: settings.enrollmentOpen,
+      enrollmentNotice: settings.enrollmentNotice,
+      allowSelfEnrollment: settings.allowSelfEnrollment && settings.enrollmentOpen,
+    };
+  }
+
   async findPublishedPrograms() {
     const organizationId = await this.resolveOrganizationId();
     return this.prisma.program.findMany({
@@ -198,8 +222,11 @@ export class PublicService {
   async registerStudent(dto: RegisterStudentDto) {
     const organizationId = await this.resolveOrganizationId();
 
-    const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId } });
-    if (!settings?.allowSelfEnrollment) {
+    const settings = await readOrgSettings(this.prisma, organizationId);
+    if (!settings.enrollmentOpen) {
+      throw new BadRequestException('Enrollment is currently closed. Please contact us about the next intake.');
+    }
+    if (!settings.allowSelfEnrollment) {
       throw new BadRequestException('Self-registration is not open. Please contact us to enroll.');
     }
 

@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { StaffStatus } from '@prisma/client';
 
 export class UpdateStaffDto {
@@ -6,13 +6,15 @@ export class UpdateStaffDto {
   @IsString()
   position?: string;
 
-  @IsOptional()
+  // `null` clears it; omitted leaves it unchanged.
+  @ValidateIf((_o, v) => v !== undefined && v !== null)
   @IsString()
-  department?: string;
+  department?: string | null;
 
-  @IsOptional()
+  // `null` unassigns the person from any branch.
+  @ValidateIf((_o, v) => v !== undefined && v !== null)
   @IsString()
-  branchId?: string;
+  branchId?: string | null;
 
   @IsOptional()
   @IsEnum(StaffStatus)

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { CreatePricingDto } from './dto/create-pricing.dto.js';
+import { readOrgSettings } from '../settings/org-settings.js';
 
 @Injectable()
 export class PricingService {
@@ -12,7 +13,9 @@ export class PricingService {
 
   findAllForProgram(organizationId: string, programId: string) {
     return this.prisma.pricing.findMany({
+      // `programId` omitted = every program's price history (Finance > Pricing).
       where: { programId, program: { organizationId } },
+      include: { program: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -33,6 +36,8 @@ export class PricingService {
     });
     if (!program) throw new NotFoundException('Program not found');
 
+    const { defaultCurrency } = await readOrgSettings(this.prisma, organizationId);
+
     const pricing = await this.prisma.$transaction(async (tx) => {
       await tx.pricing.updateMany({
         where: { programId: dto.programId, isActive: true },
@@ -43,7 +48,7 @@ export class PricingService {
         data: {
           programId: dto.programId,
           amount: dto.amount,
-          currency: dto.currency ?? 'PHP',
+          currency: dto.currency ?? defaultCurrency,
         },
       });
     });

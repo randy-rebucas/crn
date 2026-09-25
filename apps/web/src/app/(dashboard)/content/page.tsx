@@ -4,8 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -13,72 +14,52 @@ import {
   Button,
   Card,
   Drawer,
-  EmptyState,
   ErrorState,
   Field,
   Input,
   LoadingState,
   MarkdownField,
   PageHeader,
-  Select,
   StatusBadge,
 } from '@/components/ui';
 
 type ContentStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+type Kind = 'announcements' | 'success-stories' | 'faq';
 
-// Mirrors ALLOWED_TRANSITIONS in apps/api/src/modules/content/content.service.ts
-const NEXT_STATUSES: Record<ContentStatus, ContentStatus[]> = {
-  DRAFT: ['REVIEW'],
-  REVIEW: ['APPROVED', 'DRAFT'],
-  APPROVED: ['PUBLISHED', 'REVIEW'],
-  PUBLISHED: ['ARCHIVED'],
+const STAGES: ContentStatus[] = ['DRAFT', 'REVIEW', 'APPROVED', 'PUBLISHED', 'ARCHIVED'];
+
+const STAGE_LABEL: Record<ContentStatus, string> = {
+  DRAFT: 'Draft',
+  REVIEW: 'In review',
+  APPROVED: 'Approved',
+  PUBLISHED: 'Published',
+  ARCHIVED: 'Archived',
+};
+
+// Mirrors ALLOWED_TRANSITIONS in apps/api/src/modules/content/content.service.ts,
+// with the verb each move means to the person clicking it. The first entry is
+// the forward step; the rest send an item back a stage.
+const TRANSITIONS: Record<ContentStatus, { to: ContentStatus; label: string; tone: 'primary' | 'secondary' }[]> = {
+  DRAFT: [{ to: 'REVIEW', label: 'Submit for review', tone: 'primary' }],
+  REVIEW: [
+    { to: 'APPROVED', label: 'Approve', tone: 'primary' },
+    { to: 'DRAFT', label: 'Send back to draft', tone: 'secondary' },
+  ],
+  APPROVED: [
+    { to: 'PUBLISHED', label: 'Publish', tone: 'primary' },
+    { to: 'REVIEW', label: 'Return to review', tone: 'secondary' },
+  ],
+  PUBLISHED: [{ to: 'ARCHIVED', label: 'Archive', tone: 'secondary' }],
   ARCHIVED: [],
 };
 
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
-}
+const KIND_META: Record<Kind, { label: string; singular: string; color: string; endpoint: string }> = {
+  announcements: { label: 'Announcements', singular: 'announcement', color: '#b91c1c', endpoint: '/v1/content/announcements' },
+  'success-stories': { label: 'Success stories', singular: 'success story', color: '#d97706', endpoint: '/v1/content/success-stories' },
+  faq: { label: 'FAQ', singular: 'FAQ item', color: '#475569', endpoint: '/v1/content/faq' },
+};
 
-function StatusActions({
-  status,
-  canManage,
-  onTransition,
-  pending,
-}: {
-  status: ContentStatus;
-  canManage: boolean;
-  onTransition: (next: ContentStatus) => void;
-  pending: boolean;
-}) {
-  const options = NEXT_STATUSES[status];
-  if (!canManage || options.length === 0) return <StatusBadge status={status} />;
-  return (
-    <div className="flex items-center gap-2">
-      <StatusBadge status={status} />
-      <Select
-        defaultValue=""
-        disabled={pending}
-        onChange={(e) => {
-          if (e.target.value) onTransition(e.target.value as ContentStatus);
-        }}
-        className="w-auto"
-      >
-        <option value="" disabled>
-          Move to…
-        </option>
-        {options.map((s) => (
-          <option key={s} value={s}>
-            {s.replace(/_/g, ' ')}
-          </option>
-        ))}
-      </Select>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Announcements
-// ---------------------------------------------------------------------------
+const KINDS: Kind[] = ['announcements', 'success-stories', 'faq'];
 
 interface Announcement {
   id: string;
@@ -86,104 +67,9 @@ interface Announcement {
   body: string;
   status: ContentStatus;
   createdAt: string;
+  updatedAt?: string;
+  publishedAt?: string | null;
 }
-
-const createAnnouncementSchema = z.object({ title: z.string().min(1, 'Required'), body: z.string().min(1, 'Required') });
-type CreateAnnouncementValues = z.infer<typeof createAnnouncementSchema>;
-
-function AnnouncementsTab({ canManage }: { canManage: boolean }) {
-  const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-
-  const query = useQuery<Announcement[]>({
-    queryKey: ['content', 'announcements'],
-    queryFn: async () => (await apiClient.get('/v1/content/announcements')).data,
-  });
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateAnnouncementValues>({ resolver: zodResolver(createAnnouncementSchema) });
-  const [serverError, setServerError] = useState<string | null>(null);
-
-  const transition = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: ContentStatus }) =>
-      apiClient.patch(`/v1/content/announcements/${id}/status`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content', 'announcements'] }),
-  });
-
-  const onSubmit = async (values: CreateAnnouncementValues) => {
-    setServerError(null);
-    try {
-      await apiClient.post('/v1/content/announcements', values);
-      reset();
-      setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['content', 'announcements'] });
-    } catch (err) {
-      setServerError(errorMessage(err, 'Could not create announcement.'));
-    }
-  };
-
-  return (
-    <div>
-      {canManage && (
-        <div className="mb-4 flex justify-end">
-          <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New Announcement'}</Button>
-        </div>
-      )}
-      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New Announcement">
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <Field label="Title" error={errors.title?.message}>
-            <Input {...register('title')} />
-          </Field>
-          <Field label="Body" error={errors.body?.message}>
-            <MarkdownField registration={register('body')} value={watch('body')} rows={5} />
-          </Field>
-          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating…' : 'Create announcement'}
-            </Button>
-          </div>
-        </form>
-      </Drawer>
-
-      {query.isLoading && <LoadingState />}
-      {query.isError && <ErrorState message="Could not load announcements." />}
-      {!query.isLoading && query.data?.length === 0 && (
-        <EmptyState title="No announcements yet" description="Create the first announcement." />
-      )}
-
-      <div className="space-y-3">
-        {query.data?.map((a) => (
-          <Card key={a.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{a.title}</p>
-                <div className="mt-1 space-y-1 text-sm text-slate-600 [&_a]:text-red-600 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
-                  <ReactMarkdown>{a.body}</ReactMarkdown>
-                </div>
-              </div>
-              <StatusActions
-                status={a.status}
-                canManage={canManage}
-                pending={transition.isPending}
-                onTransition={(status) => transition.mutate({ id: a.id, status })}
-              />
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Success stories
-// ---------------------------------------------------------------------------
 
 interface SuccessStory {
   id: string;
@@ -192,260 +78,782 @@ interface SuccessStory {
   year: number | null;
   testimonial: string;
   status: ContentStatus;
+  createdAt?: string;
+  updatedAt?: string;
 }
-
-const createStorySchema = z.object({
-  graduateName: z.string().min(1, 'Required'),
-  programName: z.string().min(1, 'Required'),
-  year: z.string().optional(),
-  testimonial: z.string().min(1, 'Required'),
-});
-type CreateStoryValues = z.infer<typeof createStorySchema>;
-
-function SuccessStoriesTab({ canManage }: { canManage: boolean }) {
-  const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-
-  const query = useQuery<SuccessStory[]>({
-    queryKey: ['content', 'success-stories'],
-    queryFn: async () => (await apiClient.get('/v1/content/success-stories')).data,
-  });
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateStoryValues>({ resolver: zodResolver(createStorySchema) });
-  const [serverError, setServerError] = useState<string | null>(null);
-
-  const transition = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: ContentStatus }) =>
-      apiClient.patch(`/v1/content/success-stories/${id}/status`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content', 'success-stories'] }),
-  });
-
-  const onSubmit = async (values: CreateStoryValues) => {
-    setServerError(null);
-    try {
-      await apiClient.post('/v1/content/success-stories', {
-        ...values,
-        year: values.year ? Number(values.year) : undefined,
-      });
-      reset();
-      setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['content', 'success-stories'] });
-    } catch (err) {
-      setServerError(errorMessage(err, 'Could not create success story.'));
-    }
-  };
-
-  return (
-    <div>
-      {canManage && (
-        <div className="mb-4 flex justify-end">
-          <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New Success Story'}</Button>
-        </div>
-      )}
-      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New Success Story">
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <Field label="Graduate name" error={errors.graduateName?.message}>
-            <Input {...register('graduateName')} />
-          </Field>
-          <Field label="Program" error={errors.programName?.message}>
-            <Input {...register('programName')} />
-          </Field>
-          <Field label="Year">
-            <Input type="number" {...register('year')} />
-          </Field>
-          <Field label="Testimonial" error={errors.testimonial?.message}>
-            <MarkdownField registration={register('testimonial')} value={watch('testimonial')} rows={5} />
-          </Field>
-          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating…' : 'Create success story'}
-            </Button>
-          </div>
-        </form>
-      </Drawer>
-
-      {query.isLoading && <LoadingState />}
-      {query.isError && <ErrorState message="Could not load success stories." />}
-      {!query.isLoading && query.data?.length === 0 && (
-        <EmptyState title="No success stories yet" description="Add the first one." />
-      )}
-
-      <div className="space-y-3">
-        {query.data?.map((s) => (
-          <Card key={s.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  {s.graduateName} <span className="text-xs font-normal text-slate-500">· {s.programName} {s.year ?? ''}</span>
-                </p>
-                <div className="mt-1 space-y-1 text-sm text-slate-600 [&_a]:text-red-600 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
-                  <ReactMarkdown>{s.testimonial}</ReactMarkdown>
-                </div>
-              </div>
-              <StatusActions
-                status={s.status}
-                canManage={canManage}
-                pending={transition.isPending}
-                onTransition={(status) => transition.mutate({ id: s.id, status })}
-              />
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// FAQ
-// ---------------------------------------------------------------------------
 
 interface FaqItem {
   id: string;
   question: string;
   answer: string;
   status: ContentStatus;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-const createFaqSchema = z.object({ question: z.string().min(1, 'Required'), answer: z.string().min(1, 'Required') });
-type CreateFaqValues = z.infer<typeof createFaqSchema>;
+type ItemOf<K extends Kind> = K extends 'announcements' ? Announcement : K extends 'success-stories' ? SuccessStory : FaqItem;
 
-function FaqTab({ canManage }: { canManage: boolean }) {
-  const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
+const icons = {
+  megaphone: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <path d="M4 10v4a1 1 0 0 0 1 1h2l7 4V5L7 9H5a1 1 0 0 0-1 1Z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" />
+      <path d="M17.5 9a4 4 0 0 1 0 6M8 15l1 4.5" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" />
+    </svg>
+  ),
+  quote: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <path d="M9.5 7C6.5 8 5 10.3 5 13.5V17h4.5v-4.5H7.3c.1-1.8 1-3 2.7-3.7L9.5 7ZM18.5 7c-3 1-4.5 3.3-4.5 6.5V17h4.5v-4.5h-2.2c.1-1.8 1-3 2.7-3.7L18.5 7Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+    </svg>
+  ),
+  help: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <circle cx={12} cy={12} r={8.2} stroke="currentColor" strokeWidth={1.7} />
+      <path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" />
+      <circle cx={12} cy={16.6} r={0.9} fill="currentColor" />
+    </svg>
+  ),
+  flow: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <rect x={3.5} y={9} width={5} height={6} rx={1.2} stroke="currentColor" strokeWidth={1.7} />
+      <rect x={15.5} y={9} width={5} height={6} rx={1.2} stroke="currentColor" strokeWidth={1.7} />
+      <path d="M8.5 12h7m-2.5-2.5L15.5 12 13 14.5" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  inbox: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <path d="M4 13.5 6.2 5.8A1.3 1.3 0 0 1 7.5 4.8h9a1.3 1.3 0 0 1 1.3 1l2.2 7.7V18a1.3 1.3 0 0 1-1.3 1.3H5.3A1.3 1.3 0 0 1 4 18v-4.5Z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" />
+      <path d="M4 13.5h4.5l1 2h5l1-2H20" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" />
+    </svg>
+  ),
+  search: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <circle cx={11} cy={11} r={6.5} stroke="currentColor" strokeWidth={1.7} />
+      <path d="m16 16 4 4" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" />
+    </svg>
+  ),
+  plus: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden>
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    </svg>
+  ),
+  chevron: (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-90" aria-hidden>
+      <path d="M7 5l6 5-6 5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  check: (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <path d="m5.5 12.5 4 4 9-9.5" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+};
 
-  const query = useQuery<FaqItem[]>({
-    queryKey: ['content', 'faq'],
-    queryFn: async () => (await apiClient.get('/v1/content/faq')).data,
+const KIND_ICON: Record<Kind, React.ReactNode> = {
+  announcements: icons.megaphone,
+  'success-stories': icons.quote,
+  faq: icons.help,
+};
+
+const MARKDOWN_PROSE =
+  'space-y-1.5 text-sm leading-relaxed text-slate-600 [&_a]:text-red-700 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold [&_strong]:text-slate-800';
+
+function errorMessage(err: unknown, fallback: string) {
+  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
+}
+
+function formatDate(iso?: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function itemTitle(kind: Kind, item: Announcement | SuccessStory | FaqItem) {
+  if (kind === 'announcements') return (item as Announcement).title;
+  if (kind === 'success-stories') return (item as SuccessStory).graduateName;
+  return (item as FaqItem).question;
+}
+
+function itemSearchText(kind: Kind, item: Announcement | SuccessStory | FaqItem) {
+  if (kind === 'announcements') {
+    const a = item as Announcement;
+    return `${a.title} ${a.body}`;
+  }
+  if (kind === 'success-stories') {
+    const s = item as SuccessStory;
+    return `${s.graduateName} ${s.programName} ${s.year ?? ''} ${s.testimonial}`;
+  }
+  const f = item as FaqItem;
+  return `${f.question} ${f.answer}`;
+}
+
+function useContent<K extends Kind>(kind: K) {
+  return useQuery<ItemOf<K>[]>({
+    queryKey: ['content', kind],
+    queryFn: async () => (await apiClient.get(KIND_META[kind].endpoint)).data,
   });
+}
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateFaqValues>({ resolver: zodResolver(createFaqSchema) });
-  const [serverError, setServerError] = useState<string | null>(null);
+function SectionCard({
+  icon,
+  title,
+  meta,
+  action,
+  children,
+  className = '',
+}: {
+  icon: React.ReactNode;
+  title: string;
+  meta?: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card className={`p-5 ${className}`}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-red-50 text-red-700">{icon}</span>
+          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          {meta && <span className="text-xs text-slate-400">{meta}</span>}
+        </div>
+        {action}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+// --- Status actions ---------------------------------------------------------
+
+function StatusActions({
+  kind,
+  id,
+  status,
+  canManage,
+}: {
+  kind: Kind;
+  id: string;
+  status: ContentStatus;
+  canManage: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const transition = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: ContentStatus }) =>
-      apiClient.patch(`/v1/content/faq/${id}/status`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content', 'faq'] }),
+    mutationFn: (next: ContentStatus) => apiClient.patch(`${KIND_META[kind].endpoint}/${id}/status`, { status: next }),
+    onSuccess: () => {
+      setError(null);
+      setConfirmArchive(false);
+      return queryClient.invalidateQueries({ queryKey: ['content', kind] });
+    },
+    onError: (err) => setError(errorMessage(err, 'Could not change the status. Try again.')),
   });
 
-  const onSubmit = async (values: CreateFaqValues) => {
-    setServerError(null);
-    try {
-      await apiClient.post('/v1/content/faq', values);
-      reset();
-      setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['content', 'faq'] });
-    } catch (err) {
-      setServerError(errorMessage(err, 'Could not create FAQ item.'));
-    }
-  };
+  const options = TRANSITIONS[status];
+  if (!canManage || options.length === 0) return null;
+
+  const pendingTo = transition.isPending ? transition.variables : null;
 
   return (
-    <div>
-      {canManage && (
-        <div className="mb-4 flex justify-end">
-          <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New FAQ Item'}</Button>
-        </div>
-      )}
-      <Drawer open={showForm} onClose={() => setShowForm(false)} title="New FAQ Item">
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <Field label="Question" error={errors.question?.message}>
-            <Input {...register('question')} />
-          </Field>
-          <Field label="Answer" error={errors.answer?.message}>
-            <MarkdownField registration={register('answer')} value={watch('answer')} rows={5} />
-          </Field>
-          {serverError && <p className="text-sm text-red-600">{serverError}</p>}
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating…' : 'Create FAQ item'}
+    <div className="flex flex-col items-start gap-1.5 sm:items-end">
+      <div className="flex flex-wrap gap-2 sm:justify-end">
+        {options.map((opt) => {
+          const isArchive = opt.to === 'ARCHIVED';
+          if (isArchive && confirmArchive) {
+            return (
+              <span key={opt.to} className="flex items-center gap-2">
+                <span className="text-xs text-slate-600">Archiving is permanent.</span>
+                <Button variant="danger" disabled={transition.isPending} onClick={() => transition.mutate(opt.to)}>
+                  {pendingTo === opt.to ? 'Archiving…' : 'Archive'}
+                </Button>
+                <Button variant="ghost" disabled={transition.isPending} onClick={() => setConfirmArchive(false)}>
+                  Cancel
+                </Button>
+              </span>
+            );
+          }
+          return (
+            <Button
+              key={opt.to}
+              variant={opt.tone}
+              disabled={transition.isPending}
+              onClick={() => (isArchive ? setConfirmArchive(true) : transition.mutate(opt.to))}
+            >
+              {pendingTo === opt.to ? 'Saving…' : opt.label}
             </Button>
-          </div>
-        </form>
-      </Drawer>
-
-      {query.isLoading && <LoadingState />}
-      {query.isError && <ErrorState message="Could not load FAQ items." />}
-      {!query.isLoading && query.data?.length === 0 && <EmptyState title="No FAQ items yet" description="Add the first one." />}
-
-      <div className="space-y-3">
-        {query.data?.map((f) => (
-          <Card key={f.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{f.question}</p>
-                <div className="mt-1 space-y-1 text-sm text-slate-600 [&_a]:text-red-600 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
-                  <ReactMarkdown>{f.answer}</ReactMarkdown>
-                </div>
-              </div>
-              <StatusActions
-                status={f.status}
-                canManage={canManage}
-                pending={transition.isPending}
-                onTransition={(status) => transition.mutate({ id: f.id, status })}
-              />
-            </div>
-          </Card>
-        ))}
+          );
+        })}
       </div>
+      {error && (
+        <p role="alert" className="text-xs text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+// --- Item renderers ---------------------------------------------------------
 
-type Tab = 'announcements' | 'success-stories' | 'faq';
+function ItemMeta({ status, date, dateLabel }: { status: ContentStatus; date?: string | null; dateLabel: string }) {
+  const formatted = formatDate(date);
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <StatusBadge status={status} />
+      {formatted && (
+        <span>
+          {dateLabel} {formatted}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AnnouncementItem({ item, canManage }: { item: Announcement; canManage: boolean }) {
+  return (
+    <li className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="min-w-0">
+        <ItemMeta
+          status={item.status}
+          date={item.status === 'PUBLISHED' ? item.publishedAt ?? item.updatedAt : item.updatedAt ?? item.createdAt}
+          dateLabel={item.status === 'PUBLISHED' ? 'Published' : 'Updated'}
+        />
+        <h3 className="mt-2 text-base font-semibold text-slate-900">{item.title}</h3>
+        <div className={`mt-1 max-w-prose ${MARKDOWN_PROSE}`}>
+          <ReactMarkdown>{item.body}</ReactMarkdown>
+        </div>
+      </div>
+      <StatusActions kind="announcements" id={item.id} status={item.status} canManage={canManage} />
+    </li>
+  );
+}
+
+function StoryItem({ item, canManage }: { item: SuccessStory; canManage: boolean }) {
+  const initials = item.graduateName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('');
+  return (
+    <li className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="min-w-0">
+        <ItemMeta status={item.status} date={item.updatedAt ?? item.createdAt} dateLabel="Updated" />
+        <blockquote className="mt-3 flex gap-3">
+          <span className="mt-0.5 shrink-0 text-amber-500">{icons.quote}</span>
+          <div className={`max-w-prose italic ${MARKDOWN_PROSE}`}>
+            <ReactMarkdown>{item.testimonial}</ReactMarkdown>
+          </div>
+        </blockquote>
+        <div className="mt-3 flex items-center gap-2.5 pl-7">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-xs font-semibold text-amber-800">
+            {initials}
+          </span>
+          <div className="min-w-0 text-sm">
+            <div className="truncate font-medium text-slate-900">{item.graduateName}</div>
+            <div className="truncate text-xs text-slate-500">
+              {item.programName}
+              {item.year ? ` · ${item.year}` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+      <StatusActions kind="success-stories" id={item.id} status={item.status} canManage={canManage} />
+    </li>
+  );
+}
+
+function FaqRow({ item, canManage }: { item: FaqItem; canManage: boolean }) {
+  return (
+    <li className="px-5 py-3">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-md py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 [&::-webkit-details-marker]:hidden">
+          <span className="mt-0.5">{icons.chevron}</span>
+          <span className="min-w-0 flex-1 text-sm font-medium text-slate-900">{item.question}</span>
+          <StatusBadge status={item.status} />
+        </summary>
+        <div className="mt-2 grid gap-4 pb-2 pl-7 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className={`max-w-prose ${MARKDOWN_PROSE}`}>
+            <ReactMarkdown>{item.answer}</ReactMarkdown>
+          </div>
+          <StatusActions kind="faq" id={item.id} status={item.status} canManage={canManage} />
+        </div>
+      </details>
+    </li>
+  );
+}
+
+// --- Forms ------------------------------------------------------------------
+
+function FormFooter({ serverError, isSubmitting, label }: { serverError: string | null; isSubmitting: boolean; label: string }) {
+  return (
+    <>
+      <p className="text-xs text-slate-500">New items start as drafts. Submit them for review when they&apos;re ready.</p>
+      {serverError && <ErrorState message={serverError} />}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving…' : label}
+        </Button>
+      </div>
+    </>
+  );
+}
+
+const announcementSchema = z.object({
+  title: z.string().trim().min(1, 'Add a title'),
+  body: z.string().trim().min(1, 'Write the announcement'),
+});
+type AnnouncementValues = z.infer<typeof announcementSchema>;
+
+function AnnouncementForm({ onCreated }: { onCreated: () => void }) {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const { register, handleSubmit, control, formState } = useForm<AnnouncementValues>({
+    resolver: zodResolver(announcementSchema),
+    defaultValues: { title: '', body: '' },
+  });
+  const body = useWatch({ control, name: 'body' });
+  const onSubmit = async (values: AnnouncementValues) => {
+    setServerError(null);
+    try {
+      await apiClient.post(KIND_META.announcements.endpoint, values);
+      onCreated();
+    } catch (err) {
+      setServerError(errorMessage(err, 'Could not save the announcement. Try again.'));
+    }
+  };
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Title" error={formState.errors.title?.message}>
+        <Input placeholder="e.g. Now accepting enrollees for the May NLE batch" {...register('title')} />
+      </Field>
+      <Field label="Body" error={formState.errors.body?.message}>
+        <MarkdownField registration={register('body')} value={body} rows={7} />
+      </Field>
+      <FormFooter serverError={serverError} isSubmitting={formState.isSubmitting} label="Save draft" />
+    </form>
+  );
+}
+
+const storySchema = z.object({
+  graduateName: z.string().trim().min(1, "Add the graduate's name"),
+  programName: z.string().trim().min(1, 'Add the program'),
+  year: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^(19|20)\d{2}$/.test(v), 'Enter a 4-digit year'),
+  testimonial: z.string().trim().min(1, 'Add their testimonial'),
+});
+type StoryValues = z.infer<typeof storySchema>;
+
+function StoryForm({ onCreated }: { onCreated: () => void }) {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const { register, handleSubmit, control, formState } = useForm<StoryValues>({
+    resolver: zodResolver(storySchema),
+    defaultValues: { graduateName: '', programName: '', year: '', testimonial: '' },
+  });
+  const testimonial = useWatch({ control, name: 'testimonial' });
+  const onSubmit = async (values: StoryValues) => {
+    setServerError(null);
+    try {
+      await apiClient.post(KIND_META['success-stories'].endpoint, {
+        ...values,
+        year: values.year ? Number(values.year) : undefined,
+      });
+      onCreated();
+    } catch (err) {
+      setServerError(errorMessage(err, 'Could not save the success story. Try again.'));
+    }
+  };
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Graduate name" error={formState.errors.graduateName?.message}>
+        <Input {...register('graduateName')} />
+      </Field>
+      <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
+        <Field label="Program" error={formState.errors.programName?.message}>
+          <Input placeholder="e.g. NLE" {...register('programName')} />
+        </Field>
+        <Field label="Year passed" error={formState.errors.year?.message}>
+          <Input inputMode="numeric" placeholder="2025" {...register('year')} />
+        </Field>
+      </div>
+      <Field label="Testimonial" error={formState.errors.testimonial?.message}>
+        <MarkdownField registration={register('testimonial')} value={testimonial} rows={6} />
+      </Field>
+      <FormFooter serverError={serverError} isSubmitting={formState.isSubmitting} label="Save draft" />
+    </form>
+  );
+}
+
+const faqSchema = z.object({
+  question: z.string().trim().min(1, 'Add the question'),
+  answer: z.string().trim().min(1, 'Add the answer'),
+});
+type FaqValues = z.infer<typeof faqSchema>;
+
+function FaqForm({ onCreated }: { onCreated: () => void }) {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const { register, handleSubmit, control, formState } = useForm<FaqValues>({
+    resolver: zodResolver(faqSchema),
+    defaultValues: { question: '', answer: '' },
+  });
+  const answer = useWatch({ control, name: 'answer' });
+  const onSubmit = async (values: FaqValues) => {
+    setServerError(null);
+    try {
+      await apiClient.post(KIND_META.faq.endpoint, values);
+      onCreated();
+    } catch (err) {
+      setServerError(errorMessage(err, 'Could not save the FAQ item. Try again.'));
+    }
+  };
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Field label="Question" error={formState.errors.question?.message}>
+        <Input placeholder="e.g. Do you offer weekend classes?" {...register('question')} />
+      </Field>
+      <Field label="Answer" error={formState.errors.answer?.message}>
+        <MarkdownField registration={register('answer')} value={answer} rows={6} />
+      </Field>
+      <FormFooter serverError={serverError} isSubmitting={formState.isSubmitting} label="Save draft" />
+    </form>
+  );
+}
+
+// --- Overview ---------------------------------------------------------------
+
+function PipelineOverview({
+  data,
+  canManage,
+  onJump,
+}: {
+  data: Record<Kind, (Announcement | SuccessStory | FaqItem)[] | undefined>;
+  canManage: boolean;
+  onJump: (kind: Kind, stage: ContentStatus) => void;
+}) {
+  const chartData = STAGES.map((stage) => {
+    const row: Record<string, string | number> = { stage: STAGE_LABEL[stage] };
+    for (const kind of KINDS) row[kind] = (data[kind] ?? []).filter((i) => i.status === stage).length;
+    return row;
+  });
+
+  const waiting = KINDS.flatMap((kind) =>
+    (data[kind] ?? [])
+      .filter((i) => i.status === 'REVIEW' || i.status === 'APPROVED')
+      .map((item) => ({ kind, item })),
+  ).sort((a, b) => (a.item.status === b.item.status ? 0 : a.item.status === 'APPROVED' ? -1 : 1));
+
+  return (
+    <div className="mb-6 grid gap-6 lg:grid-cols-5">
+      <SectionCard icon={icons.flow} title="Publishing pipeline" meta="All content types" className="lg:col-span-3">
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={chartData} barCategoryGap="30%">
+            <CartesianGrid vertical={false} stroke="#f1f5f9" />
+            <XAxis dataKey="stage" interval={0} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
+            <Tooltip
+              cursor={{ fill: '#f8fafc' }}
+              contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+              formatter={(value, key) => [value, KIND_META[key as Kind]?.label ?? String(key)]}
+            />
+            {KINDS.map((kind, i) => (
+              <Bar
+                key={kind}
+                dataKey={kind}
+                stackId="k"
+                fill={KIND_META[kind].color}
+                radius={i === KINDS.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                isAnimationActive={false}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+          {KINDS.map((kind) => (
+            <span key={kind} className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: KIND_META[kind].color }} />
+              {KIND_META[kind].label}
+            </span>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        icon={icons.inbox}
+        title={canManage ? 'Waiting on you' : 'In progress'}
+        meta={waiting.length > 0 ? `${waiting.length} ${waiting.length === 1 ? 'item' : 'items'}` : undefined}
+        className="lg:col-span-2"
+      >
+        {waiting.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {icons.check}
+            Nothing is waiting for review or publishing.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {waiting.slice(0, 6).map(({ kind, item }) => (
+              <li key={`${kind}-${item.id}`}>
+                <button
+                  type="button"
+                  onClick={() => onJump(kind, item.status)}
+                  className="flex w-full items-center gap-3 rounded-lg border border-slate-100 px-3 py-2.5 text-left transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                >
+                  <span className="shrink-0" style={{ color: KIND_META[kind].color }}>
+                    {KIND_ICON[kind]}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-900">{itemTitle(kind, item)}</span>
+                    <span className="block text-xs text-slate-500">
+                      {item.status === 'APPROVED' ? 'Approved, ready to publish' : 'Waiting for approval'}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+            {waiting.length > 6 && <li className="px-1 text-xs text-slate-500">and {waiting.length - 6} more</li>}
+          </ul>
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
+// --- Tab body ---------------------------------------------------------------
+
+function ContentList({
+  kind,
+  canManage,
+  stage,
+  onStage,
+}: {
+  kind: Kind;
+  canManage: boolean;
+  stage: ContentStatus | 'ALL';
+  onStage: (s: ContentStatus | 'ALL') => void;
+}) {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState('');
+  const query = useContent(kind);
+  const items = (query.data ?? []) as (Announcement | SuccessStory | FaqItem)[];
+  const meta = KIND_META[kind];
+  const searchLabel = `Search ${kind === 'faq' ? 'FAQ' : meta.label.toLowerCase()}`;
+
+  const q = search.trim().toLowerCase();
+  const visible = items.filter(
+    (item) => (stage === 'ALL' || item.status === stage) && (!q || itemSearchText(kind, item).toLowerCase().includes(q)),
+  );
+
+  const chips: { key: ContentStatus | 'ALL'; label: string; count: number }[] = [
+    { key: 'ALL', label: 'All', count: items.length },
+    ...STAGES.map((s) => ({ key: s, label: STAGE_LABEL[s], count: items.filter((i) => i.status === s).length })),
+  ];
+
+  const onCreated = () => {
+    setShowForm(false);
+    onStage('ALL');
+    queryClient.invalidateQueries({ queryKey: ['content', kind] });
+  };
+
+  return (
+    <SectionCard
+      icon={KIND_ICON[kind]}
+      title={meta.label}
+      meta={`${items.length} total`}
+      action={
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <label className="relative block w-full sm:w-60">
+            <span className="sr-only">{searchLabel}</span>
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">{icons.search}</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={searchLabel}
+              className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm placeholder:text-slate-500 focus:border-red-600 focus:outline-none"
+            />
+          </label>
+          {canManage && (
+            <Button onClick={() => setShowForm(true)} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+              {icons.plus}
+              New {meta.singular}
+            </Button>
+          )}
+        </div>
+      }
+    >
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title={`New ${meta.singular}`}>
+        {kind === 'announcements' && <AnnouncementForm onCreated={onCreated} />}
+        {kind === 'success-stories' && <StoryForm onCreated={onCreated} />}
+        {kind === 'faq' && <FaqForm onCreated={onCreated} />}
+      </Drawer>
+
+      <div className="-mx-5 mb-1 flex gap-1.5 overflow-x-auto px-5 pb-2" role="group" aria-label="Filter by stage">
+        {chips.map((chip) => {
+          const on = stage === chip.key;
+          return (
+            <button
+              key={chip.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onStage(chip.key)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 ${
+                on ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {chip.label}
+              <span className={`tabular-nums ${on ? 'text-slate-300' : 'text-slate-400'}`}>{chip.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {query.isLoading && <LoadingState />}
+      {query.isError && <ErrorState message={`Could not load ${meta.label.toLowerCase()}. Refresh the page to try again.`} />}
+
+      {!query.isLoading && !query.isError && items.length === 0 && (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 py-14 text-center">
+          <span className="mb-2 text-slate-300">{KIND_ICON[kind]}</span>
+          <p className="text-sm font-medium text-slate-700">No {meta.label.toLowerCase()} yet</p>
+          {canManage && (
+            <Button className="mt-4" onClick={() => setShowForm(true)}>
+              Write the first {meta.singular}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {items.length > 0 && visible.length === 0 && (
+        <div className="py-10 text-center">
+          <p className="text-sm font-medium text-slate-700">Nothing matches</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Try another search, or{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                onStage('ALL');
+              }}
+              className="font-medium text-red-700 underline-offset-2 hover:underline"
+            >
+              show everything
+            </button>
+            .
+          </p>
+        </div>
+      )}
+
+      {visible.length > 0 && (
+        <ul className="-mx-5 divide-y divide-slate-100 border-t border-slate-100">
+          {visible.map((item) =>
+            kind === 'announcements' ? (
+              <AnnouncementItem key={item.id} item={item as Announcement} canManage={canManage} />
+            ) : kind === 'success-stories' ? (
+              <StoryItem key={item.id} item={item as SuccessStory} canManage={canManage} />
+            ) : (
+              <FaqRow key={item.id} item={item as FaqItem} canManage={canManage} />
+            ),
+          )}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}
+
+// --- Page -------------------------------------------------------------------
 
 export default function ContentPage() {
   const { hasPermission } = useAuth();
-  const [tab, setTab] = useState<Tab>('announcements');
+  const [tab, setTab] = useState<Kind>('announcements');
+  const [stage, setStage] = useState<ContentStatus | 'ALL'>('ALL');
   const canManage = hasPermission('content.manage');
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'announcements', label: 'Announcements' },
-    { key: 'success-stories', label: 'Success Stories' },
-    { key: 'faq', label: 'FAQ' },
-  ];
+  const announcements = useContent('announcements');
+  const stories = useContent('success-stories');
+  const faq = useContent('faq');
+  const data: Record<Kind, (Announcement | SuccessStory | FaqItem)[] | undefined> = {
+    announcements: announcements.data,
+    'success-stories': stories.data,
+    faq: faq.data,
+  };
+  const overviewReady = KINDS.every((k) => data[k] !== undefined);
+  const published = KINDS.reduce((sum, k) => sum + (data[k] ?? []).filter((i) => i.status === 'PUBLISHED').length, 0);
+  const total = KINDS.reduce((sum, k) => sum + (data[k]?.length ?? 0), 0);
 
   return (
     <div>
       <PageHeader
         title="Content"
-        description="Public marketing content — announcements, success stories, and FAQ — through the same Draft → Review → Approved → Published → Archived pipeline as curriculum."
+        description="Announcements, success stories, and FAQ for the public site. Each item moves from draft through review and approval before it's published."
       />
 
-      <div className="mb-6 flex gap-1 border-b border-slate-200">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-sm font-medium transition ${
-              tab === t.key ? 'border-b-2 border-red-700 text-red-700' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {overviewReady && total > 0 && (
+        <>
+          <Card className="mb-6 grid grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-slate-100">
+            {[
+              ...KINDS.map((k) => ({
+                icon: KIND_ICON[k],
+                label: KIND_META[k].label,
+                value: data[k]?.length ?? 0,
+                color: KIND_META[k].color,
+              })),
+              { icon: icons.check, label: 'Live on the site', value: published, color: '#059669' },
+            ].map((stat) => (
+              <div key={stat.label} className="flex items-center gap-3 p-4 sm:p-5">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                  style={{ backgroundColor: `${stat.color}14`, color: stat.color }}
+                >
+                  {stat.icon}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-base font-semibold tabular-nums text-slate-900 sm:text-lg">{stat.value}</div>
+                  <div className="text-xs leading-snug text-slate-500">{stat.label}</div>
+                </div>
+              </div>
+            ))}
+          </Card>
+          <PipelineOverview
+            data={data}
+            canManage={canManage}
+            onJump={(kind, s) => {
+              setTab(kind);
+              setStage(s);
+            }}
+          />
+        </>
+      )}
+
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
+        {KINDS.map((k) => {
+          const on = tab === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => {
+                setTab(k);
+                setStage('ALL');
+              }}
+              className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 ${
+                on ? 'border-red-700 text-red-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {KIND_ICON[k]}
+              {KIND_META[k].label}
+              {data[k] && (
+                <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {data[k]?.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {tab === 'announcements' && <AnnouncementsTab canManage={canManage} />}
-      {tab === 'success-stories' && <SuccessStoriesTab canManage={canManage} />}
-      {tab === 'faq' && <FaqTab canManage={canManage} />}
+      <ContentList key={tab} kind={tab} canManage={canManage} stage={stage} onStage={setStage} />
     </div>
   );
 }

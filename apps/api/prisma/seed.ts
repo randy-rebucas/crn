@@ -383,6 +383,22 @@ async function main() {
     create: { name: 'OBIAS Nursing & Allied Courses Review Center', slug: 'obias' },
   });
 
+  // Real contact details (see apps/web/PRODUCT.md) so the public site's
+  // footer and contact page render from Settings on a fresh database.
+  // `update: {}` — never overwrite what an admin has since edited.
+  await prisma.organizationSettings.upsert({
+    where: { organizationId: org.id },
+    update: {},
+    create: {
+      organizationId: org.id,
+      supportEmail: 'centerofreviewfornursing@gmail.com',
+      supportPhone: '0917 165 4780',
+      additionalPhones: ['0939 126 2602', '0951 562 4048', '0923 812 2649'],
+      address: 'Jinyang Bldg. #1, Manila Doctors Access Road, Almanza Uno, Las Piñas City',
+      facebookPageName: 'Obias Nursing & Allied Courses Review Center',
+    },
+  });
+
   const mainBranch = await prisma.branch.upsert({
     where: { organizationId_code: { organizationId: org.id, code: 'MAIN' } },
     update: {},
@@ -1221,6 +1237,25 @@ async function main() {
     studentProfiles.push({ ...profile, email: user.email, firstName: user.firstName, lastName: user.lastName });
   }
 
+  // A class roster is "students ENROLLED in the class's batch" (see
+  // ClassesService.roster), so without these the attendance seeded below
+  // belongs to students no class ever lists.
+  let seededEnrollments = 0;
+  for (const student of studentProfiles) {
+    const existing = await prisma.enrollment.findFirst({ where: { studentId: student.id, batchId: mainBatch.id } });
+    if (existing) continue;
+    await prisma.enrollment.create({
+      data: {
+        studentId: student.id,
+        programId: nursingProgram.id,
+        batchId: mainBatch.id,
+        branchId: mainBranch.id,
+        status: 'ENROLLED',
+      },
+    });
+    seededEnrollments += 1;
+  }
+
   const attendanceMarker = leadInstructorDemo ? emailToUserId.get(leadInstructorDemo.email) : undefined;
   const sectionAClass = classByName.get('NCLEX Review - Section A');
   const attendanceDates = ['2026-01-06', '2026-01-08', '2026-01-13'];
@@ -1375,7 +1410,14 @@ async function main() {
   );
   console.log(`Seeded rooms: ${seededRooms}, classes: ${seededClasses}, schedules: ${seededSchedules}`);
   console.log('Seeded staff profiles:', seededStaff);
-  console.log('Seeded students:', studentProfiles.length, '| attendance records:', seededAttendance);
+  console.log(
+    'Seeded students:',
+    studentProfiles.length,
+    '| enrollments:',
+    seededEnrollments,
+    '| attendance records:',
+    seededAttendance,
+  );
   console.log('Seeded question bank items:', seededQuestions);
   console.log('Seeded pricing entries:', seededPricing);
   if (!process.env.SEED_ADMIN_PASSWORD) {

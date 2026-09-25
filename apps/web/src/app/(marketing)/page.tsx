@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { fetchPublicSettings } from '@/lib/public-settings';
 
 export const metadata: Metadata = {
   title: 'Your Partner in Passing. Your Future in Healthcare.',
@@ -125,7 +126,12 @@ function Initial({ name }: { name: string }) {
   );
 }
 
-export default function MarketingHomePage() {
+export default async function MarketingHomePage() {
+  const settings = await fetchPublicSettings();
+  // Banner text is admin-controlled (Settings > Enrollment); closing
+  // enrollment swaps it for a next-intake prompt.
+  const banner = settings.enrollmentOpen ? settings.enrollmentNotice : 'Enrollment closed · Inquire for the next intake';
+
   return (
     <div>
       {/* Hero */}
@@ -217,10 +223,14 @@ export default function MarketingHomePage() {
 
         <div className="relative border-t border-black/10 bg-brand-maroon">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3.5 text-sm font-semibold text-white">
-            <span className="rounded bg-brand-gold px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-maroon-dark">
-              Now Accepting Enrollees!
-            </span>
-            <span className="text-white/50">/</span>
+            {banner && (
+              <>
+                <span className="rounded bg-brand-gold px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-maroon-dark">
+                  {banner}
+                </span>
+                <span className="text-white/50">/</span>
+              </>
+            )}
             <span className="italic">&ldquo;Your Partner in Passing. Your Future in Healthcare.&rdquo;</span>
           </div>
         </div>

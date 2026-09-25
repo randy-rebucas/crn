@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { branchScopeWhere } from '../../common/authz/scope.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateInvoiceDto } from './dto/create-invoice.dto.js';
+import { readOrgSettings } from '../settings/org-settings.js';
 
 @Injectable()
 export class InvoicesService {
@@ -19,7 +20,23 @@ export class InvoicesService {
   findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.invoice.findMany({
       where: { organizationId: user.organizationId, ...branchScopeWhere(user, 'invoices.view') },
-      include: { payments: true },
+      include: {
+        // Processed refunds come along so clients can show the same net-paid
+        // figure recomputeStatus uses (verified payments minus paid-out refunds).
+        payments: {
+          include: {
+            receipt: true,
+            refunds: { where: { status: RefundStatus.PROCESSED }, select: { id: true, amount: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        enrollment: {
+          select: {
+            student: { select: { user: { select: { firstName: true, lastName: true } } } },
+            program: { select: { name: true } },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -49,6 +66,14 @@ export class InvoicesService {
       throw new BadRequestException('Discount cannot exceed the program price');
     }
 
+    // No due date given: fall back to the organization's default payment term, if any.
+    const { invoiceDueDays } = await readOrgSettings(this.prisma, organizationId);
+    const dueDate = dto.dueDate
+      ? new Date(dto.dueDate)
+      : invoiceDueDays != null
+        ? new Date(Date.now() + invoiceDueDays * 86_400_000)
+        : undefined;
+
     const invoice = await this.prisma.invoice.create({
       data: {
         enrollmentId: dto.enrollmentId,
@@ -57,7 +82,7 @@ export class InvoicesService {
         amount: pricing.amount,
         discountAmount,
         totalAmount: pricing.amount - discountAmount,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        dueDate,
       },
     });
 

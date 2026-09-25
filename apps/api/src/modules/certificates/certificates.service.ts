@@ -7,6 +7,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { certificateScopeWhere } from '../../common/authz/scope.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { IssueCertificateDto } from './dto/issue-certificate.dto.js';
+import { readOrgSettings } from '../settings/org-settings.js';
 
 @Injectable()
 export class CertificatesService {
@@ -65,12 +66,14 @@ export class CertificatesService {
     });
     if (existing) throw new BadRequestException('A certificate has already been issued for this completion');
 
+    const settings = await readOrgSettings(this.prisma, organizationId);
+
     const certificate = await this.prisma.certificate.create({
       data: {
         organizationId,
         studentId: dto.studentId,
         programId: dto.programId,
-        certificateNumber: `CERT-${new Date().getFullYear()}-${randomBytes(4).toString('hex').toUpperCase()}`,
+        certificateNumber: `${settings.certificatePrefix}-${new Date().getFullYear()}-${randomBytes(4).toString('hex').toUpperCase()}`,
         qrToken: randomBytes(16).toString('hex'),
         issuedById: actorId,
       },
@@ -85,13 +88,15 @@ export class CertificatesService {
       afterState: certificate,
     });
 
-    await this.notifications.emit({
-      organizationId,
-      userId: student.userId,
-      type: 'certificate.issued',
-      title: 'Certificate issued',
-      body: `Your certificate ${certificate.certificateNumber} is ready.`,
-    });
+    if (settings.notifyOnCertificateIssued) {
+      await this.notifications.emit({
+        organizationId,
+        userId: student.userId,
+        type: 'certificate.issued',
+        title: 'Certificate issued',
+        body: `Your certificate ${certificate.certificateNumber} is ready.`,
+      });
+    }
 
     return certificate;
   }

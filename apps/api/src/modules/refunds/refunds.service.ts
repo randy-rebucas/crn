@@ -31,6 +31,22 @@ export class RefundsService {
   findAllForOrganization(user: AuthenticatedUser) {
     return this.prisma.refund.findMany({
       where: { organizationId: user.organizationId, ...refundScopeWhere(user, 'refunds.view') },
+      include: {
+        payment: {
+          select: {
+            amount: true,
+            method: true,
+            receipt: { select: { receiptNumber: true } },
+            invoice: {
+              select: {
+                enrollment: {
+                  select: { student: { select: { user: { select: { firstName: true, lastName: true } } } } },
+                },
+              },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

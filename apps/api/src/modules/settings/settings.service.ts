@@ -13,7 +13,7 @@ export class SettingsService {
     private readonly audit: AuditService,
   ) {}
 
-  async get(organizationId: string) {
+  private async row(organizationId: string) {
     return this.prisma.organizationSettings.upsert({
       where: { organizationId },
       update: {},
@@ -21,13 +21,35 @@ export class SettingsService {
     });
   }
 
+  // The organization's display name lives on Organization, not the settings
+  // row, but it's edited from the same screen — return both together.
+  async get(organizationId: string) {
+    const [settings, organization] = await Promise.all([
+      this.row(organizationId),
+      this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } }),
+    ]);
+    return { ...settings, organizationName: organization.name };
+  }
+
   async update(organizationId: string, actorId: string, dto: UpdateSettingsDto) {
     const before = await this.get(organizationId);
+    const { organizationName, ...settingsData } = dto;
 
-    const settings = await this.prisma.organizationSettings.update({
-      where: { organizationId },
-      data: { ...dto, updatedById: actorId },
-    });
+    const [settings] = await this.prisma.$transaction([
+      this.prisma.organizationSettings.update({
+        where: { organizationId },
+        data: {
+          ...settingsData,
+          additionalPhones: settingsData.additionalPhones?.map((p) => p.trim()).filter(Boolean),
+          updatedById: actorId,
+        },
+      }),
+      ...(organizationName
+        ? [this.prisma.organization.update({ where: { id: organizationId }, data: { name: organizationName.trim() } })]
+        : []),
+    ]);
+
+    const after = { ...settings, organizationName: organizationName?.trim() ?? before.organizationName };
 
     await this.audit.log({
       organizationId,
@@ -36,9 +58,9 @@ export class SettingsService {
       resource: 'organization_settings',
       resourceId: settings.id,
       beforeState: before,
-      afterState: settings,
+      afterState: after,
     });
 
-    return settings;
+    return after;
   }
 }

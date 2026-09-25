@@ -12,6 +12,11 @@ import { RegisterStudentDto } from './dto/register-student.dto.js';
 export class PublicController {
   constructor(private readonly publicService: PublicService) {}
 
+  @Get('settings')
+  findSettings() {
+    return this.publicService.findPublicSettings();
+  }
+
   @Get('programs')
   findPrograms() {
     return this.publicService.findPublishedPrograms();

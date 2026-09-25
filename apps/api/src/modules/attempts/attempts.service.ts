@@ -3,6 +3,7 @@ import { AttemptStatus, ContentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { attemptScopeWhere, getScope } from '../../common/authz/scope.js';
+import { SAFE_USER_SELECT } from '../../common/prisma/safe-selects.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { gradeResponse } from './grading.js';
 import type { SubmitAttemptDto } from './dto/submit-attempt.dto.js';
@@ -44,7 +45,7 @@ export class AttemptsService {
         exam: { organizationId: user.organizationId },
         ...(await this.resolveGradeScopeWhere(user)),
       },
-      include: { student: { select: { id: true } } },
+      include: { student: { select: { id: true, user: { select: SAFE_USER_SELECT } } } },
       orderBy: { startedAt: 'desc' },
     });
   }
@@ -83,6 +84,26 @@ export class AttemptsService {
       where: { id, exam: { organizationId } },
       include: {
         exam: true,
+        answers: { include: { question: { select: { id: true, content: true, type: true } } } },
+      },
+    });
+    if (!attempt) throw new NotFoundException('Attempt not found');
+    return attempt;
+  }
+
+  // Grader view of one attempt (answers + student), scoped exactly like
+  // findAllForExam/gradeAnswer so an ASSIGNED-scope instructor can only open
+  // attempts from their own classes.
+  async findOneForGrader(user: AuthenticatedUser, id: string) {
+    const attempt = await this.prisma.attempt.findFirst({
+      where: {
+        id,
+        exam: { organizationId: user.organizationId },
+        ...(await this.resolveGradeScopeWhere(user)),
+      },
+      include: {
+        exam: true,
+        student: { select: { id: true, user: { select: SAFE_USER_SELECT } } },
         answers: { include: { question: { select: { id: true, content: true, type: true } } } },
       },
     });
@@ -238,6 +259,17 @@ export class AttemptsService {
     if (!answer) throw new NotFoundException('Answer not found for this attempt');
     if (!answer.needsManualGrading) {
       throw new BadRequestException('This answer does not require manual grading');
+    }
+
+    // Cap at what the question is worth on this exam, or one grader could
+    // push a score past maxScore and flip pass/fail on its own.
+    const examQuestion = await this.prisma.examQuestion.findUnique({
+      where: { examId_questionId: { examId: attempt.examId, questionId } },
+      select: { points: true },
+    });
+    const maxPoints = examQuestion?.points ?? 1;
+    if (pointsAwarded > maxPoints) {
+      throw new BadRequestException(`This question is worth at most ${maxPoints} point${maxPoints === 1 ? '' : 's'}`);
     }
 
     await this.prisma.attemptAnswer.update({

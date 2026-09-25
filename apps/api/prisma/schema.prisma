@@ -18,15 +18,15 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  branches Branch[]
-  users    User[]
-  roles    Role[]
-  programs Program[]
-  leads    Lead[]
-  settings OrganizationSettings?
-  announcements Announcement[]
+  branches       Branch[]
+  users          User[]
+  roles          Role[]
+  programs       Program[]
+  leads          Lead[]
+  settings       OrganizationSettings?
+  announcements  Announcement[]
   successStories SuccessStory[]
-  faqItems FaqItem[]
+  faqItems       FaqItem[]
 
   @@map("organizations")
 }
@@ -1028,17 +1028,36 @@ model AuditLog {
 // enrollment/notification toggles). Deliberately not per-branch: branches
 // already have their own row for anything that varies by location.
 model OrganizationSettings {
-  id                      String   @id @default(uuid())
-  organizationId          String   @unique
-  supportEmail            String?
-  supportPhone            String?
-  timezone                String   @default("Asia/Manila")
-  allowSelfEnrollment     Boolean  @default(false)
-  notifyOnEnrollment      Boolean  @default(true)
-  notifyOnPaymentVerified Boolean  @default(true)
-  updatedById             String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                        String  @id @default(uuid())
+  organizationId            String  @unique
+  supportEmail              String?
+  supportPhone              String?
+  timezone                  String  @default("Asia/Manila")
+  allowSelfEnrollment       Boolean @default(false)
+  notifyOnEnrollment        Boolean @default(true)
+  notifyOnPaymentVerified   Boolean @default(true)
+  notifyOnCertificateIssued Boolean @default(true)
+
+  // Public-site contact block (marketing footer + contact page).
+  address          String?
+  additionalPhones String[] @default([])
+  facebookPageName String?
+  facebookUrl      String?
+
+  // Enrollment window: closing it stops online self-registration and swaps
+  // the public "Now Accepting Enrollees!" banner off.
+  enrollmentOpen   Boolean @default(true)
+  enrollmentNotice String? @default("Now Accepting Enrollees!")
+
+  // Finance and document numbering defaults.
+  defaultCurrency   String @default("PHP")
+  invoiceDueDays    Int?
+  receiptPrefix     String @default("RCPT")
+  certificatePrefix String @default("CERT")
+
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1121,15 +1140,15 @@ model Admission {
 // ---------------------------------------------------------------------------
 
 model Announcement {
-  id          String        @id @default(uuid())
+  id             String        @id @default(uuid())
   organizationId String
-  title       String
-  body        String
-  publishedAt DateTime?
-  status      ContentStatus @default(DRAFT)
-  authorId    String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  title          String
+  body           String
+  publishedAt    DateTime?
+  status         ContentStatus @default(DRAFT)
+  authorId       String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
   author       User?        @relation(fields: [authorId], references: [id])

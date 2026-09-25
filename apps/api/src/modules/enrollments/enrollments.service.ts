@@ -8,6 +8,7 @@ import { enrollmentScopeWhere } from '../../common/authz/scope.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateEnrollmentDto } from './dto/create-enrollment.dto.js';
 import { ENROLLMENT_TRANSITIONS } from './enrollment-transitions.js';
+import { readOrgSettings } from '../settings/org-settings.js';
 
 const STUDENT_INCLUDE = { student: { select: { id: true, user: { select: SAFE_USER_SELECT } } } };
 
@@ -104,7 +105,10 @@ export class EnrollmentsService {
       afterState: { status: updated.status },
     });
 
-    if (nextStatus === EnrollmentStatus.ENROLLED || nextStatus === EnrollmentStatus.APPROVED) {
+    const notify =
+      (nextStatus === EnrollmentStatus.ENROLLED || nextStatus === EnrollmentStatus.APPROVED) &&
+      (await readOrgSettings(this.prisma, organizationId)).notifyOnEnrollment;
+    if (notify) {
       await this.notifications.emit({
         organizationId,
         userId: enrollment.student.user.id,
