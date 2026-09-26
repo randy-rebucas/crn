@@ -3,6 +3,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { listPrograms } from '@/lib/public-api';
 import { fetchPublicSettings } from '@/lib/public-settings';
+import { Icon, IconBadge, type IconName } from './icons';
+import { TestimonialCarousel, type Testimonial } from './testimonial-carousel';
 
 export const metadata: Metadata = {
   title: 'Your Partner in Passing. Your Future in Healthcare.',
@@ -10,125 +12,60 @@ export const metadata: Metadata = {
     '20+ years of proven results preparing nursing and allied-health graduates for their board exams.',
 };
 
-const HERO_HIGHLIGHTS = [
-  { label: 'Comprehensive Review Materials' },
-  { label: 'Proven Results' },
-  { label: 'Experienced Review Instructors' },
+const HERO_HIGHLIGHTS: { label: string; icon: IconName }[] = [
+  { label: 'Comprehensive Review Materials', icon: 'book' },
+  { label: 'Proven Results', icon: 'target' },
+  { label: 'Experienced Review Instructors', icon: 'people' },
 ];
 
 // Curated copy and icons per board program. `match` finds the published
 // program (by name) whose page the card links to; without one it falls back
-// to the full list.
-const PROGRAMS = [
-  { name: 'Nursing (NLE)', match: 'nursing', blurb: 'Comprehensive review for future RNs.', icon: 'stethoscope' as const },
-  { name: 'Midwifery', match: 'midwifery', blurb: 'Build a brighter future in midwifery.', icon: 'caregiving' as const },
-  { name: 'Medical Technology', match: 'medical tech', blurb: 'Pass with confidence.', icon: 'microscope' as const },
-  { name: 'Physical Therapy', match: 'physical therapy', blurb: 'Achieve your goals in allied health.', icon: 'therapy' as const },
+// to the full list. `lines` sets the card title's line breaks.
+const PROGRAMS: { name: string; lines: string[]; match: string; blurb: string; icon: IconName }[] = [
+  { name: 'Nursing (NLE)', lines: ['Nursing', '(NLE)'], match: 'nursing', blurb: 'Comprehensive review for future RNs', icon: 'stethoscope' },
+  { name: 'Midwifery', lines: ['Midwifery'], match: 'midwifery', blurb: 'Build a brighter future in midwifery', icon: 'midwifery' },
+  { name: 'Medical Technology', lines: ['Medical', 'Technology'], match: 'medical tech', blurb: 'Pass with confidence', icon: 'microscope' },
+  { name: 'Physical Therapy', lines: ['Physical', 'Therapy'], match: 'physical therapy', blurb: 'Achieve your goals in allied health', icon: 'therapy' },
 ];
 
 const ALSO_OFFERING = ['Seminar & Training', 'Caregiving Course', 'Foreign Language Skills'];
 
-const FEATURES = [
-  {
-    name: 'Experienced Review Instructors',
-    blurb: 'Learn from industry experts and topnotchers.',
-    icon: 'people' as const,
-  },
-  {
-    name: 'Comprehensive Review Materials',
-    blurb: 'Updated and structured review resources.',
-    icon: 'book' as const,
-  },
-  { name: 'Proven Results', blurb: 'High passing rate and success stories.', icon: 'target' as const },
-  { name: 'Affordable Programs', blurb: 'Quality review at affordable rates.', icon: 'peso' as const },
+const FEATURES: { lines: string[]; blurb: string; icon: IconName }[] = [
+  { lines: ['Experienced', 'Review Instructors'], blurb: 'Learn from industry experts and topnotchers.', icon: 'people' },
+  { lines: ['Comprehensive', 'Review Materials'], blurb: 'Updated and structured review resources.', icon: 'book' },
+  { lines: ['Proven Results'], blurb: 'High passing rate and success stories.', icon: 'target' },
+  { lines: ['Affordable', 'Programs'], blurb: 'Quality review at affordable rates.', icon: 'peso' },
 ];
 
-const STATS = [
-  { value: '20+', label: 'Years of Excellence', icon: 'graduationCap' as const },
-  { value: 'Thousands', label: 'of Successful Reviewees', icon: 'people' as const },
-  { value: 'High', label: 'Passing Rate', icon: 'chart' as const },
-  {
-    value: 'Many',
-    label: 'Healthcare Professionals Now Serving the Community',
-    icon: 'heart' as const,
-  },
+const STATS: { value: string; label: string[]; icon: IconName }[] = [
+  { value: '20+', label: ['Years of Excellence'], icon: 'graduationCap' },
+  { value: 'Thousands', label: ['of Successful Reviewees'], icon: 'people' },
+  { value: 'High', label: ['Passing Rate'], icon: 'chart' },
+  { value: 'Many', label: ['Healthcare Professionals', 'Now Serving the Community'], icon: 'heart' },
 ];
 
-const TESTIMONIALS = [
+const TESTIMONIALS: Testimonial[] = [
   {
     name: 'Maria S.',
     role: 'NLE Passer',
     quote: 'Obias Review Center gave me the confidence and knowledge I needed to pass the NLE. Highly recommended!',
+    photo: '/brands/marketing/resources/review_person_01.png',
   },
   {
     name: 'John D.',
     role: 'MedTech Passer',
     quote: 'The instructors are very approachable and the materials are comprehensive. Worth it!',
+    photo: '/brands/marketing/resources/review_person_02.png',
   },
   {
     name: 'Alyssa M.',
     role: 'Midwifery Passer',
     quote: 'A big thank you to Obias for helping me achieve my dream. Excellent review experience!',
+    photo: '/brands/marketing/resources/review_person_03.png',
   },
 ];
 
-const ICON_PATHS = {
-  stethoscope:
-    'M8 3v5.5a4 4 0 0 0 8 0V3M8 3H6M16 3h2M12 12.5V16a5 5 0 0 0 10 0v-1.5M22 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
-  caregiving:
-    'M12 20.5s-6.5-4-8.5-8.2C2.3 9.6 3.3 6.7 6 6c1.9-.5 3.6.5 4.6 2M12 20.5s6.5-4 8.5-8.2c1.2-2.7.2-5.6-2.5-6.3-1.9-.5-3.6.5-4.6 2M9 10.5h6M12 7.5v6',
-  microscope:
-    'M9 21h9M12 21v-4M8 17h7l-1-4.5M9 12.5h4M10.5 12.5V6a1.5 1.5 0 0 1 3 0v1M14.5 4.5l2 2M6 17a4 4 0 0 1 4-4',
-  therapy:
-    'M13 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM10 21l1.5-6.5L9 13l1-4.5c.2-1 1-1.5 2-1.5s1.8.5 2 1.5L15 13l-2.5 1.5L14 21M9 13l-3 2M15 13l3 2',
-  people:
-    'M7 20v-1.5a3.5 3.5 0 0 1 3.5-3.5h3a3.5 3.5 0 0 1 3.5 3.5V20M12 11.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3 20v-1a3 3 0 0 1 2.5-2.96M21 20v-1a3 3 0 0 0-2.5-2.96M6.5 8.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5ZM17.5 8.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z',
-  book: 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5H6.5A2.5 2.5 0 0 0 4 21V5.5ZM4 18.5A2.5 2.5 0 0 1 6.5 16H20',
-  target:
-    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9ZM12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
-  peso: 'M6 21V4h6.5a4 4 0 1 1 0 8H6M4 11.5h11M4 14.5h9',
-  graduationCap:
-    'M2 9.5 12 5l10 4.5-10 4.5-10-4.5ZM6 11.7v4.8c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.8M20 9.5v6',
-  chart: 'M4 20V10M10 20V4M16 20v-8M22 20H2',
-  heart: 'M12 20.5S3.5 15.4 3.5 9.3A4.8 4.8 0 0 1 12 6.4a4.8 4.8 0 0 1 8.5 2.9C20.5 15.4 12 20.5 12 20.5Z',
-} as const;
-
-type IconName = keyof typeof ICON_PATHS;
-
-function Icon({ name, className }: { name: IconName; className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={className}
-    >
-      <path d={ICON_PATHS[name]} />
-    </svg>
-  );
-}
-
-function IconBadge({ name, size = 'md' }: { name: IconName; size?: 'md' | 'lg' }) {
-  const dimensions = size === 'lg' ? 'h-[72px] w-[72px]' : 'h-14 w-14';
-  const iconSize = size === 'lg' ? 'h-8 w-8' : 'h-6 w-6';
-  return (
-    <div className={`flex ${dimensions} shrink-0 items-center justify-center rounded-full bg-brand-maroon text-white`}>
-      <Icon name={name} className={iconSize} />
-    </div>
-  );
-}
-
-function Initial({ name }: { name: string }) {
-  return (
-    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-maroon text-sm font-semibold text-white">
-      {name.charAt(0)}
-    </div>
-  );
-}
+const RESOURCES = '/brands/marketing/resources';
 
 export default async function MarketingHomePage() {
   // The home page must render even when the API is down: settings fall back
@@ -145,212 +82,234 @@ export default async function MarketingHomePage() {
   return (
     <div>
       {/* Hero */}
-      <header
-        className="relative bg-brand-gold bg-cover bg-center"
-        style={{ backgroundImage: "url('/696c7d29-ae75-4ef5-b54e-0a725cca54a7.png')" }}
-      >
-        <div className="relative mx-auto grid max-w-6xl gap-10 px-6 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-20 lg:pb-24">
-          <div>
-            <div className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-brand-maroon-dark">
+      <section className="relative overflow-hidden bg-brand-gold">
+        <Image
+          src="/696c7d29-ae75-4ef5-b54e-0a725cca54a7.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        {/* Soft light wash behind the headline, as in the reference. */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[linear-gradient(100deg,rgb(255_251_230/0.6)_0%,rgb(255_251_230/0.4)_35%,transparent_62%)]"
+        />
+        <div className="relative mx-auto max-w-6xl px-6 pt-10 sm:pt-12 lg:flex lg:min-h-[min(46.5vw,680px)] lg:items-center lg:py-12">
+          <div className="relative z-10 lg:max-w-[min(41vw,500px)]">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.32em] text-brand-navy sm:text-xs">
               20+ Years of Excellence
-            </div>
-            <h1 className="mt-3 font-heading text-[clamp(2.4rem,4.6vw,3.75rem)] leading-[1.02] font-bold uppercase text-brand-maroon">
-              Obias
-              <span className="block text-slate-900">Nursing &amp; Allied Courses</span>
-              <span className="block text-brand-maroon">Review Center</span>
+            </p>
+            <h1 className="mt-3 w-fit uppercase">
+              <span className="block font-sans text-[clamp(3.4rem,6vw,5.4rem)] font-extrabold leading-[0.9] tracking-[-0.02em] text-brand-maroon">
+                Obias
+              </span>
+              <span className="block font-sans text-[clamp(2rem,3.5vw,3.15rem)] font-extrabold leading-[1.02] tracking-[-0.025em] text-brand-navy">
+                Nursing &amp;
+                <br />
+                Allied Courses
+              </span>
+              <span className="mt-2 flex items-center gap-3 font-heading text-[clamp(1.35rem,2.2vw,1.95rem)] font-bold leading-none tracking-[0.05em] text-brand-maroon">
+                <span className="flex flex-1 items-center" aria-hidden="true">
+                  <span className="h-1.5 w-1.5 bg-brand-maroon" />
+                  <span className="ml-1.5 h-0.5 flex-1 bg-brand-maroon" />
+                </span>
+                Review Center
+                <span className="h-0.5 flex-1 bg-brand-maroon" aria-hidden="true" />
+              </span>
             </h1>
-            <p className="font-script mt-3 text-4xl text-slate-800">Preparing Future Healthcare Professionals</p>
-            <div className="mt-8 flex flex-wrap gap-3.5">
+            <p className="font-script mt-3 whitespace-nowrap text-[clamp(1rem,4.1vw,1.6rem)] leading-tight text-brand-navy lg:text-[min(1.76vw,1.6rem)]">
+              Preparing Future Healthcare Professionals
+            </p>
+            <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-3">
+              {HERO_HIGHLIGHTS.map((item) => (
+                <li key={item.label} className="flex items-center gap-2">
+                  <Icon name={item.icon} className="h-8 w-8 shrink-0 text-brand-maroon" />
+                  <span className="max-w-[7.5rem] text-[0.6875rem] font-medium leading-tight text-brand-navy">{item.label}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-7 flex flex-wrap gap-4">
               <Link
                 href="/contact"
-                className="inline-flex items-center gap-2 rounded-md bg-brand-maroon px-6 py-3 text-sm font-bold text-white transition hover:bg-brand-maroon-dark"
+                className="inline-flex min-w-[10.5rem] items-center justify-center gap-2.5 rounded-md bg-brand-maroon px-7 py-3 font-heading text-lg font-medium tracking-wide text-white shadow-[0_6px_14px_-4px_rgb(107_20_31/0.45)] transition-colors hover:bg-brand-maroon-dark"
               >
-                Enroll Now &rarr;
+                Enroll Now
+                <Icon name="arrowRight" className="h-5 w-5" />
               </Link>
               <Link
                 href="/offerings"
-                className="inline-flex items-center gap-2 rounded-md border-2 border-brand-maroon px-6 py-3 text-sm font-bold text-brand-maroon transition hover:bg-brand-maroon hover:text-white"
+                className="inline-flex min-w-[8.5rem] items-center justify-center rounded-md border-2 border-brand-maroon bg-white px-7 py-3 font-heading text-lg font-medium tracking-wide text-brand-navy transition-colors hover:bg-brand-maroon hover:text-white"
               >
                 Learn More
               </Link>
             </div>
-            <ul className="mt-9 flex flex-wrap gap-x-6 gap-y-2.5">
-              {HERO_HIGHLIGHTS.map((item) => (
-                <li key={item.label} className="flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <span className="h-[7px] w-[7px] rounded-full bg-brand-maroon" aria-hidden="true" />
-                  {item.label}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="relative hidden h-[440px] sm:block lg:h-[520px] lg:-mr-10">
-            <div
-              className="absolute left-1/2 top-1/2 z-0 h-[573px] w-[550px] -translate-x-1/2 -translate-y-1/2"
-              style={{
-                maskImage: 'radial-gradient(ellipse 68% 72% at 50% 55%, black 55%, transparent 100%)',
-                WebkitMaskImage: 'radial-gradient(ellipse 68% 72% at 50% 55%, black 55%, transparent 100%)',
-              }}
-            >
-              <Image
-                src="/02_graduate_holding_diploma.png"
-                alt=""
-                aria-hidden="true"
-                fill
-                className="object-contain object-bottom opacity-25"
-              />
-            </div>
-
-            <div
-              className="absolute inset-0 z-10"
-              style={{
-                maskImage: 'radial-gradient(ellipse 78% 82% at 55% 62%, black 62%, transparent 100%)',
-                WebkitMaskImage: 'radial-gradient(ellipse 78% 82% at 55% 62%, black 62%, transparent 100%)',
-              }}
-            >
-              <Image
-                src="/04_medical_students_microscope.png"
-                alt="OBIAS medical technology reviewees examining a microscope slide"
-                fill
-                sizes="(min-width: 1024px) 52vw, 100vw"
-                className="object-contain object-bottom drop-shadow-2xl scale-110"
-                priority
-              />
-            </div>
-
-            <Image
-              src="/b0f44b9c-045c-4315-826f-43a03fbb53d0.png"
-              alt="Experienced review instructors, five-star rated"
-              width={128}
-              height={128}
-              className="absolute -right-4 -top-4 z-20 h-[118px] w-[118px] drop-shadow-xl"
-            />
-            <div className="absolute -bottom-3 left-1/2 z-20 w-[calc(100%-2rem)] -translate-x-1/2 rounded-md bg-brand-maroon px-5 py-3 text-center font-heading text-sm font-bold uppercase text-white shadow-xl">
-              Thousands of Successful Reviewees &middot; High Passing Rate!
-            </div>
           </div>
         </div>
 
-        <div className="relative border-t border-black/10 bg-brand-maroon">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3.5 text-sm font-semibold text-white">
-            {banner && (
-              <>
-                <span className="rounded bg-brand-gold px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-maroon-dark">
-                  {banner}
-                </span>
-                <span className="text-white/50">/</span>
-              </>
-            )}
-            <span className="italic">&ldquo;Your Partner in Passing. Your Future in Healthcare.&rdquo;</span>
-          </div>
+        {/* Hero photo: cut-out anchored bottom-right; its cropped right edge fades out. */}
+        <Image
+          src={`${RESOURCES}/hero_people_studying.png`}
+          alt="Smiling OBIAS reviewees in nursing uniforms studying together"
+          width={824}
+          height={428}
+          sizes="(min-width: 1024px) 62vw, 100vw"
+          priority
+          className="relative ml-auto mt-8 w-full max-w-2xl [mask-image:linear-gradient(to_right,black_92%,transparent)] lg:absolute lg:bottom-0 lg:right-0 lg:mt-0 lg:w-[min(62vw,920px)] lg:max-w-none"
+        />
+      </section>
+
+      {/* Enrollment banner */}
+      <div className="bg-[linear-gradient(90deg,var(--brand-maroon-dark),var(--brand-maroon)_30%,var(--brand-maroon)_70%,var(--brand-maroon-dark))]">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-x-7 gap-y-2 px-6 py-3.5 text-center text-white md:flex-row">
+          {banner && (
+            <p className="flex items-center gap-3 font-heading text-[1.6rem] font-semibold uppercase leading-none tracking-wide sm:text-[1.85rem]">
+              <Icon name="megaphone" className="h-8 w-8 shrink-0 text-brand-gold" />
+              {banner}
+            </p>
+          )}
+          {banner && <span className="hidden h-0.5 w-16 bg-white/80 md:block" aria-hidden="true" />}
+          <p className="text-sm sm:text-base">&ldquo;Your Partner in Passing. Your Future in Healthcare.&rdquo;</p>
         </div>
-      </header>
+      </div>
 
       {/* Programs */}
-      <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <h2 className="font-heading text-3xl font-bold text-slate-900">Our Review Programs</h2>
-        <p className="mt-2 text-slate-600">Comprehensive review programs designed to help you pass and excel.</p>
-
-        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-4">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:col-span-3">
-            {PROGRAMS.map((program) => (
-              <div key={program.name} className="rounded-xl border border-slate-200 bg-brand-cream p-6">
-                <IconBadge name={program.icon} />
-                <h3 className="mt-4 font-heading font-semibold text-slate-900">{program.name}</h3>
-                <p className="mt-2 text-sm text-slate-600">{program.blurb}</p>
-                <Link
-                  href={programHref(program.match)}
-                  aria-label={`Learn more about ${program.name}`}
-                  className="mt-4 inline-block text-sm font-semibold text-brand-maroon hover:text-brand-maroon-dark"
-                >
-                  Learn More &rarr;
-                </Link>
-              </div>
-            ))}
+      <section className="mx-auto max-w-6xl px-6 py-12 sm:py-14">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.01em] text-brand-navy font-sans! sm:text-[2rem]">
+              Our Review Programs
+            </h2>
+            <p className="mt-1 text-slate-600">Comprehensive review programs designed to help you pass and excel.</p>
           </div>
+          <Link
+            href="/offerings"
+            className="inline-flex shrink-0 items-center gap-2.5 self-start rounded-lg bg-brand-gold px-6 py-2.5 font-heading text-base font-semibold tracking-wide text-brand-navy shadow-[0_4px_10px_-3px_rgb(215_161_61/0.6)] transition-colors hover:bg-brand-gold-dark sm:self-auto"
+          >
+            View All Programs
+            <Icon name="arrowRight" className="h-4.5 w-4.5" />
+          </Link>
+        </div>
 
-          <div className="rounded-xl bg-brand-cream p-6">
-            <h3 className="font-heading font-semibold text-slate-900">Also Offering</h3>
-            <ul className="mt-4 space-y-3 text-sm text-slate-700">
-              {ALSO_OFFERING.map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <span className="mt-0.5 text-brand-maroon" aria-hidden="true">
-                    &#10003;
+        <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_1.5fr]">
+          {PROGRAMS.map((program) => (
+            <div
+              key={program.name}
+              className="flex flex-col items-center rounded-lg bg-[#fdf8ee] px-4 pb-5 pt-4 text-center ring-1 ring-[#f1e4c8] shadow-[0_2px_8px_-4px_rgb(15_30_61/0.12)]"
+            >
+              <IconBadge name={program.icon} className="h-[4.5rem] w-[4.5rem]" iconClassName="h-9 w-9" />
+              <h3 className="mt-3 text-[1.0625rem] font-semibold uppercase leading-[1.15] tracking-wide text-brand-navy">
+                {program.lines.map((l) => (
+                  <span key={l} className="block">
+                    {l}
                   </span>
+                ))}
+              </h3>
+              <p className="mt-2 max-w-[10rem] text-[0.75rem] leading-snug text-slate-500">{program.blurb}</p>
+              <Link
+                href={programHref(program.match)}
+                aria-label={`Learn more about ${program.name}`}
+                className="mt-auto inline-flex items-center gap-1.5 pt-4 font-heading text-[0.95rem] font-semibold tracking-wide text-brand-maroon transition-colors hover:text-brand-maroon-dark"
+              >
+                Learn More
+                <Icon name="arrowRight" className="h-4 w-4" />
+              </Link>
+            </div>
+          ))}
+
+          <div className="col-span-2 rounded-lg bg-[#fdf1d6] px-6 py-6 ring-1 ring-[#f3e2b8] md:col-span-4 lg:col-span-1">
+            <h3 className="text-xl font-semibold text-brand-navy">Also Offering:</h3>
+            <ul className="mt-5 space-y-4">
+              {ALSO_OFFERING.map((item) => (
+                <li key={item} className="flex items-center gap-3 font-heading text-[1.05rem] font-medium tracking-wide text-brand-navy">
+                  <Icon name="checkCircle" className="h-5 w-5 shrink-0 text-brand-maroon" />
                   {item}
                 </li>
               ))}
             </ul>
-            <Link
-              href="/offerings"
-              className="mt-6 inline-block w-full rounded-md bg-brand-gold px-4 py-2.5 text-center text-sm font-semibold text-brand-maroon-dark hover:bg-brand-gold-dark"
-            >
-              View All Programs &rarr;
-            </Link>
           </div>
         </div>
       </section>
 
       {/* Feature highlights */}
-      <section className="border-y border-slate-200 bg-brand-cream">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-14 text-center sm:grid-cols-2 lg:grid-cols-4">
+      <section className="bg-[linear-gradient(110deg,#fff5e3_0%,#ffffff_38%,#ffffff_62%,#fff5e3_100%)]">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-y-8 px-6 py-9 text-center lg:grid-cols-4 lg:divide-x lg:divide-[#ecdcbc]">
           {FEATURES.map((feature) => (
-            <div key={feature.name} className="flex flex-col items-center">
-              <IconBadge name={feature.icon} size="lg" />
-              <h3 className="mt-4 font-heading font-semibold text-slate-900">{feature.name}</h3>
-              <p className="mt-2 text-sm text-slate-600">{feature.blurb}</p>
+            <div key={feature.lines.join(' ')} className="flex flex-col items-center px-3">
+              <IconBadge name={feature.icon} className="h-14 w-14" iconClassName="h-7 w-7" />
+              <h3 className="mt-3 text-[0.95rem] font-semibold leading-snug text-brand-navy font-sans!">
+                {feature.lines.map((l) => (
+                  <span key={l} className="block">
+                    {l}
+                  </span>
+                ))}
+              </h3>
+              <p className="mt-2 max-w-[12rem] text-[0.8125rem] leading-snug text-slate-500">{feature.blurb}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Stats band */}
-      <section className="bg-brand-navy">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 py-14 text-center sm:grid-cols-2 lg:grid-cols-4">
+      <section className="relative overflow-hidden bg-brand-navy">
+        <Image
+          src={`${RESOURCES}/hero_healthcare_students.png`}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-[50%_35%] opacity-[0.07] grayscale"
+        />
+        <div className="relative mx-auto grid max-w-6xl grid-cols-2 gap-y-8 px-6 py-8 text-center lg:grid-cols-4 lg:divide-x lg:divide-white/25">
           {STATS.map((stat) => (
-            <div key={stat.label} className="flex flex-col items-center">
-              <Icon name={stat.icon} className="h-8 w-8 text-brand-gold" />
-              <div className="mt-3 font-heading text-3xl font-black text-brand-gold">{stat.value}</div>
-              <div className="mt-1 text-sm text-slate-300">{stat.label}</div>
+            <div key={stat.value} className="flex flex-col items-center px-3">
+              <Icon name={stat.icon} className="h-9 w-9 text-white" />
+              <p className="mt-2 font-heading text-[2.1rem] font-semibold leading-none text-brand-gold">{stat.value}</p>
+              <p className={`mt-1.5 text-white ${stat.label.length > 1 ? 'text-[0.8125rem] leading-tight' : 'text-[0.95rem]'}`}>
+                {stat.label.map((l) => (
+                  <span key={l} className="block">
+                    {l}
+                  </span>
+                ))}
+              </p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Testimonials */}
-      <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <div className="text-center">
-          <h2 className="font-heading text-3xl font-bold text-slate-900">What Our Reviewees Say</h2>
-          <p className="mt-2 text-slate-600">Real stories. Real success.</p>
-        </div>
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
-          {TESTIMONIALS.map((t) => (
-            <figure key={t.name} className="rounded-xl border border-slate-200 p-6">
-              <blockquote className="text-sm text-slate-700">&ldquo;{t.quote}&rdquo;</blockquote>
-              <figcaption className="mt-5 flex items-center gap-3">
-                <Initial name={t.name} />
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{t.name}</p>
-                  <p className="text-sm text-slate-500">{t.role}</p>
-                </div>
-              </figcaption>
-            </figure>
-          ))}
+      <section className="bg-[#f6f7f9]">
+        <div className="mx-auto max-w-6xl px-6 py-10 sm:py-12">
+          <div className="text-center">
+            <h2 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.01em] text-brand-navy font-sans! sm:text-[2rem]">
+              What Our Reviewees Say
+            </h2>
+            <p className="mt-1 text-slate-600">Real stories. Real success.</p>
+          </div>
+          <div className="mt-7">
+            <TestimonialCarousel items={TESTIMONIALS} />
+          </div>
         </div>
       </section>
 
       {/* Closing CTA */}
       <section className="bg-brand-gold">
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 py-12 text-center sm:flex-row sm:justify-between sm:text-left">
-          <div>
-            <h2 className="font-heading text-2xl font-bold text-brand-maroon-dark">Be Part of Our Success Story!</h2>
-            <p className="mt-1 text-slate-800">Enroll now and take the next step toward your healthcare career.</p>
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-6 py-7 text-center md:flex-row md:text-left">
+          <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-brand-maroon text-brand-gold">
+            <Icon name="people" className="h-10 w-10" />
+          </span>
+          <div className="flex-1">
+            <h2 className="text-[1.9rem] font-semibold leading-tight tracking-wide text-brand-navy sm:text-[2.1rem]">
+              Be Part of Our Success Story!
+            </h2>
+            <p className="mt-0.5 text-brand-navy sm:text-lg">Enroll now and take the next step toward your healthcare career.</p>
           </div>
           <Link
             href="/contact"
-            className="shrink-0 rounded-md bg-brand-maroon px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-brand-maroon-dark"
+            className="inline-flex shrink-0 items-center gap-2.5 rounded-md bg-brand-maroon px-9 py-3 font-heading text-lg font-medium tracking-wide text-white shadow-[0_6px_14px_-4px_rgb(107_20_31/0.45)] transition-colors hover:bg-brand-maroon-dark"
           >
             Enroll Now
+            <Icon name="arrowRight" className="h-5 w-5" />
           </Link>
         </div>
       </section>

@@ -58,3 +58,14 @@ h6 {
 .font-script {
   font-family: var(--font-script), cursive;
 }
+
+/* Public marketing site: browser surfaces in brand colors. */
+.marketing-site ::selection {
+  background: var(--brand-gold);
+  color: var(--brand-navy);
+}
+
+.marketing-site :focus-visible {
+  outline: 2px solid var(--brand-maroon);
+  outline-offset: 3px;
+}

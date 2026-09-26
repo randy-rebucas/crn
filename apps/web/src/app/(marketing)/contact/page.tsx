@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { EnrollmentForm } from './enrollment-form';
 import { ADDITIONAL_OFFERINGS, FALLBACK_REVIEW_PROGRAMS } from '../offerings/additional-offerings';
+import { Icon } from '../icons';
+import { EmailLink, InfoRow, PhoneList } from '../info-row';
 import { listPrograms } from '@/lib/public-api';
 import { fetchPublicSettings, phonesOf } from '@/lib/public-settings';
 
 export const metadata: Metadata = {
-  title: 'Enroll / Apply Now',
-  description: 'Submit an enrollment inquiry or contact OBIAS Review Center directly.',
+  title: 'Contact Us',
+  description: 'Send an enrollment inquiry or contact OBIAS Review Center directly by phone, email, or Facebook.',
 };
+
+const RESOURCES = '/brands/marketing/resources';
 
 export default async function ContactPage() {
   // The inquiry form must stay usable during an API outage, so the program
@@ -16,49 +21,50 @@ export default async function ContactPage() {
   const phones = phonesOf(contact);
   const reviewPrograms = programs.length > 0 ? programs.map((p) => p.name) : FALLBACK_REVIEW_PROGRAMS;
   const programOptions = [...reviewPrograms, ...ADDITIONAL_OFFERINGS.map((o) => o.name)];
+  const mapQuery = contact.address ? encodeURIComponent(contact.address) : null;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
-      <h1 className="font-heading text-3xl font-bold text-slate-900">Enroll / Apply Now</h1>
-      <p className="mt-2 max-w-xl text-slate-600">
-        Tell us which program you&apos;re interested in and we&apos;ll get back to you, or reach
-        us directly using the details below.
-      </p>
-
-      <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-brand-cream p-6">
-          <EnrollmentForm programOptions={programOptions} />
+    <div>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-brand-navy">
+        <Image
+          src={`${RESOURCES}/hero_people_studying.png`}
+          alt=""
+          width={824}
+          height={428}
+          priority
+          sizes="100vw"
+          className="absolute inset-x-0 top-1/2 w-full -translate-y-1/2 opacity-20 grayscale-[30%]"
+        />
+        <div className="absolute inset-0 bg-brand-navy/60" aria-hidden="true" />
+        <div className="relative mx-auto max-w-6xl px-6 py-12 text-center text-white sm:py-14">
+          <h1 className="text-[2.5rem] font-bold leading-tight tracking-[-0.01em] font-sans! sm:text-5xl">Get in Touch</h1>
+          <p className="mt-3 text-base text-white/85 sm:text-lg">
+            We&apos;re here to answer your questions and help you on your journey.
+          </p>
         </div>
+      </section>
 
-        <div className="text-sm text-slate-600">
-          <h2 className="font-heading text-lg font-semibold text-slate-900">Visit or Call Us</h2>
-          {!contact.enrollmentOpen && (
-            <p className="mt-3 rounded-md border border-brand-gold/60 bg-brand-gold/15 px-3 py-2 text-slate-800">
-              Enrollment for the current intake is closed. Send an inquiry and we&apos;ll reach out when the next one opens.
-            </p>
+      <section className="mx-auto grid max-w-6xl gap-10 px-6 py-12 sm:py-14 lg:grid-cols-[1fr_1.15fr_1fr] lg:gap-8">
+        {/* Contact details */}
+        <div className="flex flex-col gap-7 lg:border-r lg:border-slate-200 lg:pr-8">
+          {contact.address && (
+            <InfoRow icon="mapPin" title="Main Center">
+              <p className="uppercase leading-relaxed tracking-wide">{contact.address}</p>
+            </InfoRow>
           )}
-          {contact.address && <p className="mt-3">{contact.address}</p>}
           {phones.length > 0 && (
-            <ul className="mt-3 space-y-0.5">
-              {phones.map((phone) => (
-                <li key={phone}>
-                  <a href={`tel:${phone.replace(/\s+/g, '')}`} className="hover:text-brand-maroon">
-                    {phone}
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <InfoRow icon="phone" title="Phone Numbers">
+              <PhoneList phones={phones} />
+            </InfoRow>
           )}
           {contact.supportEmail && (
-            <p className="mt-3">
-              <a href={`mailto:${contact.supportEmail}`} className="hover:text-brand-maroon">
-                {contact.supportEmail}
-              </a>
-            </p>
+            <InfoRow icon="mail" title="Email">
+              <EmailLink email={contact.supportEmail} />
+            </InfoRow>
           )}
           {contact.facebookPageName && (
-            <p className="mt-3">
-              Facebook:{' '}
+            <InfoRow icon="facebook" title="Facebook">
               {contact.facebookUrl ? (
                 <a href={contact.facebookUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-maroon">
                   {contact.facebookPageName}
@@ -66,10 +72,45 @@ export default async function ContactPage() {
               ) : (
                 contact.facebookPageName
               )}
-            </p>
+            </InfoRow>
           )}
         </div>
-      </div>
+
+        {/* Inquiry form */}
+        <div>
+          <h2 className="text-xl font-bold text-brand-navy font-sans!">Send Us a Message</h2>
+          {!contact.enrollmentOpen && (
+            <p className="mt-3 rounded-md border border-brand-gold/60 bg-brand-gold/15 px-3 py-2 text-sm text-slate-800">
+              Enrollment for the current intake is closed. Send an inquiry and we&apos;ll reach out when the next one opens.
+            </p>
+          )}
+          <div className="mt-4">
+            <EnrollmentForm programOptions={programOptions} />
+          </div>
+        </div>
+
+        {/* Map */}
+        {mapQuery && (
+          <div className="flex flex-col">
+            <iframe
+              title="Map to OBIAS Review Center"
+              src={`https://maps.google.com/maps?q=${mapQuery}&z=16&output=embed`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="min-h-[20rem] w-full flex-1 rounded-xl border-0 ring-1 ring-slate-200 shadow-[0_4px_16px_-8px_rgb(15_30_61/0.18)]"
+            />
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${mapQuery}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 self-start font-heading text-[0.95rem] font-semibold tracking-wide text-brand-maroon hover:text-brand-maroon-dark"
+            >
+              Open in Google Maps
+              <Icon name="arrowRight" className="h-4 w-4" />
+            </a>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

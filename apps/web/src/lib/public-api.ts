@@ -110,6 +110,21 @@ export const listSuccessStories = () => list<PublicSuccessStory>('/success-stori
 export const listFaqItems = () => list<PublicFaqItem>('/faq');
 
 /** Plain-text excerpt of markdown content, for meta descriptions. */
+// A batch's status as visitors should see it. Staff don't always move a batch
+// on from UPCOMING, so the dates win: a batch that has ended is dropped (null)
+// and one that has started reads as ongoing.
+export function publicBatchStatus(batch: PublicBatch, now = new Date()): 'UPCOMING' | 'ACTIVE' | null {
+  if (batch.status !== 'UPCOMING' && batch.status !== 'ACTIVE') return null;
+  if (batch.endDate && new Date(batch.endDate) < now) return null;
+  return new Date(batch.startDate) <= now ? 'ACTIVE' : 'UPCOMING';
+}
+
+// Courses in curriculum order: codes carry the sequence (e.g. NURSING-NLE-1,
+// NURSING-NLE-2), so a numeric-aware sort puts them in the order taught.
+export function coursesInOrder(courses: PublicCourse[]): PublicCourse[] {
+  return [...courses].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+}
+
 export function excerpt(markdown: string, max = 160): string {
   const text = markdown
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')

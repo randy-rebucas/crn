@@ -160,6 +160,8 @@ Centered content column at `max-w-6xl` (1152px) with `px-6` gutters; narrower re
 
 Flat by default. Cards, sections, and buttons use a cream or white fill plus a `slate-200` hairline border for separation — no ambient box-shadow. The one exception is the hero's floating emblem elements — the ribbon banner and the star-rated instructor seal — which use a lifted shadow because they are literally overlapping the diagonal photo collage and need to visually detach from it. Depth elsewhere is conveyed by color contrast between adjacent sections, not by lifting surfaces.
 
+Homepage program and testimonial cards (matched to the approved reference comp) carry a very soft navy-tinted drop (`0 2px 8px -4px` / `0 6px 20px -8px`, ≤18% alpha) plus a hairline ring; primary buttons carry a small maroon-tinted drop. Nothing heavier.
+
 ### Shadow Vocabulary
 - **Floating emblem** (`box-shadow: shadow-xl`, Tailwind default ~`0 20px 25px -5px rgb(0 0 0 / 0.1)`): Reserved for the ribbon banner, star seal, and any element overlapping the hero photo collage, never for ordinary cards.
 
@@ -194,8 +196,11 @@ Buttons, cards, and inputs read as confident and direct: solid fills, clear bord
 - **Label:** Body-weight `slate-700` label sits above the field, set by the shared `Field` wrapper.
 
 ### Navigation
-- **Style:** White header bar, 1px `slate-200` bottom border. Logomark (circular maroon-and-gold seal with caduceus) plus wordmark in Oswald bold maroon/navy, two-line stacked ("OBIAS" + "NURSING & ALLIED COURSES REVIEW CENTER" in smaller tracked caps). Nav links in Poppins medium slate-600/navy, hovering to maroon. A solid maroon "Enroll Now" button anchors the right edge at all times — navigation itself never routes to a generic "menu," it always keeps the conversion action visible.
-- **Footer:** Two-tone footer, not single navy band. A navy "Get in Touch" panel (phone numbers, large and legible) sits beside a light-gray contact panel (address with pin icon, Facebook/email with icons, QR code with "SCAN ME" callout). Below both, a white closing strip repeats the logomark, a secondary nav row, the "Your Success Is Our Mission!" tagline in maroon script/italic, and a small heartbeat/pulse-line graphic accent tying back to the healthcare positioning. Copyright sits in a thin maroon bar at the very bottom.
+- **Style:** White header bar with a hairline shadow. CRN logomark plus wordmark: "OBIAS" in Oswald bold maroon over "NURSING & ALLIED COURSES / REVIEW CENTER" in two lines of tiny bold navy caps. Centered nav (Home · About · Programs · Reviews · Blog · Contact) in Poppins medium navy; the current page is maroon with a 2px maroon underline. A solid maroon "Enroll Now →" button (Oswald) anchors the right edge at all times.
+- **Footer:** A navy band in four hairline-divided columns: white logomark + "Your Success is Our Mission!" with a heartbeat line; "Get in Touch" with a phone glyph and the numbers in large Oswald; "Main Center" address (red pin) and "Connect With Us" (Facebook, email); a "SCAN ME!" QR code (generated from the Facebook URL setting, hidden until it is set) with a Facebook follow prompt. A white closing row carries the full nav (current page maroon) and the copyright.
+
+### Type pairing in practice
+Poppins 800 carries the hero wordmark lines and section titles ("Our Review Programs"); Oswald carries buttons, program names, list items, stat values, the enrollment banner and the closing CTA headline. Because the global `h1–h6` rule sets Oswald unlayered, Poppins headings need `font-sans!`.
 
 ### Icon Badge
 [Signature component] A filled maroon circle (~72–96px) holding a white line-art icon (stethoscope, caregiving hands, microscope, therapy figure, people, book, target, peso sign). Used for program cards and the feature-highlights row. This is the primary device for making each program/feature instantly scannable — icon first, name second, blurb third. Never use a photo or emoji here; always a simple white glyph on solid maroon.

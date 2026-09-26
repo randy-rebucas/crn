@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { errorMessage } from '@/lib/errors';
-import { Button, Field, Input, Select } from '@/components/ui';
+import { Field, Input, Select } from '@/components/ui';
+import { Icon } from '../icons';
 
 export function EnrollmentForm({ programOptions }: { programOptions: string[] }) {
   const [submitted, setSubmitted] = useState(false);
@@ -81,9 +82,14 @@ export function EnrollmentForm({ programOptions }: { programOptions: string[] })
       <p role="alert" className="text-sm text-red-600 empty:hidden">
         {error}
       </p>
-      <Button type="submit" disabled={submitting} className="w-full justify-center py-2.5 text-base">
-        {submitting ? 'Sending…' : 'Submit Enrollment Inquiry'}
-      </Button>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand-maroon py-3 font-heading text-lg font-medium tracking-wide text-white shadow-[0_6px_14px_-4px_rgb(107_20_31/0.45)] transition-colors hover:bg-brand-maroon-dark disabled:opacity-60"
+      >
+        {submitting ? 'Sending…' : 'Send Message'}
+        {!submitting && <Icon name="arrowRight" className="h-5 w-5" />}
+      </button>
     </form>
   );
 }
