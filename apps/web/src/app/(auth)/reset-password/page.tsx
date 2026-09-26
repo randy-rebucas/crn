@@ -1,13 +1,13 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { isAxiosError } from 'axios';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 
 const schema = z.object({
   newPassword: z.string().min(8, 'At least 8 characters'),
@@ -32,10 +32,7 @@ function ResetPasswordForm() {
       await apiClient.post('/v1/auth/password-reset/confirm', { token, newPassword: values.newPassword });
       setDone(true);
     } catch (err) {
-      setServerError(
-        (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ??
-          'This reset link is invalid or has expired.',
-      );
+      setServerError(errorMessage(err, 'This reset link is invalid or has expired.'));
     }
   };
 
@@ -59,9 +56,13 @@ function ResetPasswordForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">New password</label>
+        <label htmlFor="reset-new-password" className="mb-1 block text-sm font-medium text-slate-700">
+          New password
+        </label>
         <input
+          id="reset-new-password"
           type="password"
+          autoComplete="new-password"
           placeholder="Enter your new password"
           className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
           {...register('newPassword')}

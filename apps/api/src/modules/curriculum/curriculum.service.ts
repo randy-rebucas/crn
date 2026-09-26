@@ -46,6 +46,30 @@ export class CurriculumService {
     });
   }
 
+  // A subject's whole module > lesson > material tree in one query, with the
+  // same published-only rule applied at every level as the per-level
+  // endpoints — the curriculum page previously walked it one request per
+  // module and per lesson.
+  async findOutlineForSubject(user: AuthenticatedUser, subjectId: string) {
+    const programIds = await accessibleProgramIds(this.prisma, user, 'courses.view');
+    const visible = publishedOnlyWhere(user, 'courses.update');
+    return this.prisma.module.findMany({
+      where: {
+        subjectId,
+        subject: { course: { program: programWhere(user.organizationId, programIds) } },
+        ...visible,
+      },
+      include: {
+        lessons: {
+          where: visible,
+          orderBy: { position: 'asc' },
+          include: { materials: { where: visible, orderBy: { position: 'asc' } } },
+        },
+      },
+      orderBy: { position: 'asc' },
+    });
+  }
+
   async createModule(organizationId: string, actorId: string, dto: CreateModuleDto) {
     const subject = await this.prisma.subject.findFirst({
       where: { id: dto.subjectId, course: { program: { organizationId } } },

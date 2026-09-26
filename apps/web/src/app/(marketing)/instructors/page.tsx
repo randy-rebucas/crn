@@ -1,31 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { API_BASE_URL } from '@/lib/api-client';
+import { listInstructors } from '@/lib/public-api';
 
 export const metadata: Metadata = {
   title: 'Our Instructors',
   description: 'Meet the experienced review instructors at OBIAS Nursing & Allied Courses Review Center.',
 };
 
-interface PublicInstructor {
-  id: string;
-  bio: string | null;
-  specialization: string | null;
-  user: { firstName: string; lastName: string };
-}
-
-async function getInstructors(): Promise<PublicInstructor[]> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/instructors`, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
-    return res.json();
-  } catch {
-    return [];
-  }
-}
-
 export default async function InstructorsPage() {
-  const instructors = await getInstructors();
+  const instructors = await listInstructors();
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">

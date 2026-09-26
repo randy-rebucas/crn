@@ -1,10 +1,10 @@
 'use client';
 
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { Card, Drawer, EmptyState, ErrorState, StatusBadge } from '@/components/ui';
 
 type QuestionType =
@@ -63,11 +63,6 @@ const MANUAL_TYPES = new Set<QuestionType>(['ESSAY', 'IMAGE_BASED']);
 
 function nameOf(a: Attempt) {
   return `${a.student.user.firstName} ${a.student.user.lastName}`.trim();
-}
-
-function errorText(err: unknown, fallback: string) {
-  const m = isAxiosError<{ message?: string | string[] }>(err) ? err.response?.data?.message : undefined;
-  return (Array.isArray(m) ? m.join('. ') : m) ?? fallback;
 }
 
 /** Turns a stored response (option ids, booleans, text) into what the student actually chose. */
@@ -215,7 +210,7 @@ function AttemptReview({
       apiClient.patch(`/v1/attempts/${attempt.id}/answers/${questionId}/grade`, { pointsAwarded }),
     onMutate: () => setError(null),
     onSuccess: onGraded,
-    onError: (err) => setError(errorText(err, 'Could not save that grade.')),
+    onError: (err) => setError(errorMessage(err,'Could not save that grade.')),
   });
 
   const byQuestion = new Map(exam?.questions.map((q) => [q.questionId, q]));
@@ -451,20 +446,21 @@ export function GradingView() {
   const [filter, setFilter] = useState<Filter | null>(null);
   const [reviewId, setReviewId] = useState<string | null>(null);
 
-  // Only exams someone has attempted can have anything to grade; their
-  // attempt lists share the ['attempts', id] cache with the instructor
-  // Today view, so the per-exam "to grade" counts are usually already warm.
-  const attemptedExams = useMemo(() => (exams ?? []).filter((e) => (e._count?.attempts ?? 0) > 0), [exams]);
-  const perExam = useQueries({
-    queries: attemptedExams.map((exam) => ({
-      queryKey: ['attempts', exam.id],
-      queryFn: async () => (await apiClient.get<Attempt[]>('/v1/attempts', { params: { examId: exam.id } })).data,
-    })),
-    combine: (results) =>
-      new Map(
-        attemptedExams.map((exam, i) => [exam.id, results[i]?.data?.filter((a) => a.status === 'SUBMITTED').length ?? null]),
-      ),
+  // Every attempt the caller may grade, across all exams, in one request
+  // (GET /v1/attempts without examId). Same ['attempts', 'queue'] cache as
+  // the instructor Today view, so it's usually already warm.
+  const queue = useQuery<Attempt[]>({
+    queryKey: ['attempts', 'queue'],
+    queryFn: async () => (await apiClient.get('/v1/attempts')).data,
   });
+  const perExam = useMemo(() => {
+    const counts = new Map<string, number | null>();
+    for (const exam of exams ?? []) counts.set(exam.id, queue.data ? 0 : null);
+    for (const a of queue.data ?? []) {
+      if (a.status === 'SUBMITTED') counts.set(a.examId, (counts.get(a.examId) ?? 0) + 1);
+    }
+    return counts;
+  }, [exams, queue.data]);
 
   // Exams with work waiting first, then by attempt count, then title.
   const sortedExams = useMemo(
@@ -480,11 +476,8 @@ export function GradingView() {
   const activeExamId = examId ?? sortedExams.find((e) => (e._count?.attempts ?? 0) > 0)?.id ?? sortedExams[0]?.id ?? '';
   const activeExam = sortedExams.find((e) => e.id === activeExamId);
 
-  const { data: attempts, isLoading, isError } = useQuery<Attempt[]>({
-    queryKey: ['attempts', activeExamId],
-    queryFn: async () => (await apiClient.get('/v1/attempts', { params: { examId: activeExamId } })).data,
-    enabled: Boolean(activeExamId),
-  });
+  const { isLoading, isError } = queue;
+  const attempts = useMemo(() => queue.data?.filter((a) => a.examId === activeExamId), [queue.data, activeExamId]);
   // For per-question points and option text in the review panel.
   const { data: examDetail } = useQuery<ExamDetail>({
     queryKey: ['exams', activeExamId],
@@ -538,7 +531,8 @@ export function GradingView() {
             onNext={() => nextUp && setReviewId(nextUp.id)}
             onGraded={() => {
               queryClient.invalidateQueries({ queryKey: ['attempt-detail', reviewing.id] });
-              queryClient.invalidateQueries({ queryKey: ['attempts', activeExamId] });
+              // Prefix match: the queue plus the per-exam lists on /results.
+              queryClient.invalidateQueries({ queryKey: ['attempts'] });
             }}
           />
         )}

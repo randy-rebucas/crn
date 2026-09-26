@@ -1,32 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { API_BASE_URL } from '@/lib/api-client';
-
-interface PublicCourse {
-  id: string;
-  name: string;
-  code: string;
-  description: string | null;
-}
-
-interface PublicProgram {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  courses: PublicCourse[];
-}
-
-async function getProgram(slug: string): Promise<PublicProgram | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/programs/${slug}`, { next: { revalidate: 60 } });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+import { getProgram } from '@/lib/public-api';
 
 type PageParams = { slug: string; courseId: string };
 

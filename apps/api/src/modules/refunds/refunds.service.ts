@@ -70,8 +70,19 @@ export class RefundsService {
       },
     });
     if (!payment) throw new NotFoundException('Verified payment not found');
-    if (dto.amount > payment.amount) {
-      throw new BadRequestException('Refund amount cannot exceed the original payment amount');
+    // Every refund still in play (anything not rejected) counts against the
+    // payment, so several requests can't add up to more than was paid.
+    const alreadyRefunded = await this.prisma.refund.aggregate({
+      where: { paymentId: dto.paymentId, status: { not: RefundStatus.REJECTED } },
+      _sum: { amount: true },
+    });
+    const refundable = payment.amount - (alreadyRefunded._sum.amount ?? 0);
+    if (dto.amount > refundable) {
+      throw new BadRequestException(
+        refundable > 0
+          ? `Only ${(refundable / 100).toFixed(2)} of this payment is left to refund`
+          : 'This payment has already been fully refunded or has refunds pending for its full amount',
+      );
     }
 
     const refund = await this.prisma.refund.create({
@@ -117,6 +128,20 @@ export class RefundsService {
     const allowed = ALLOWED_TRANSITIONS[refund.status];
     if (!allowed.includes(nextStatus)) {
       throw new BadRequestException(`Cannot move refund from ${refund.status} to ${nextStatus}`);
+    }
+
+    // Separation of duties per refund, not just per role: someone holding an
+    // officer role and a manager role must not push one refund through both
+    // approvals alone. The audit log is the record of who officer-approved.
+    if (nextStatus === RefundStatus.APPROVED) {
+      const officerApproval = await this.prisma.auditLog.findFirst({
+        where: { organizationId, resource: 'refund', resourceId: id, action: 'refund.officer_approved' },
+        orderBy: { createdAt: 'desc' },
+        select: { actorId: true },
+      });
+      if (officerApproval?.actorId === actorId) {
+        throw new ForbiddenException('The manager approval must come from someone other than the officer who approved it');
+      }
     }
 
     const updated = await this.prisma.refund.update({

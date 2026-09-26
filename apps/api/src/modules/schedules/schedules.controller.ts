@@ -20,7 +20,7 @@ export class SchedulesController {
 
   @Get()
   @RequirePermissions('schedules.view')
-  findAll(@CurrentUser() user: AuthenticatedUser, @Query('classId') classId: string) {
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query('classId') classId?: string) {
     return this.schedules.findAllForClass(user.organizationId, classId);
   }
 

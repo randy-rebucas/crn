@@ -14,7 +14,7 @@ export class CoursesController {
 
   @Get()
   @RequirePermissions('courses.view')
-  findAll(@CurrentUser() user: AuthenticatedUser, @Query('programId') programId: string) {
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query('programId') programId?: string) {
     return this.courses.findAllForProgram(user, programId);
   }
 

@@ -1,13 +1,13 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -39,6 +39,8 @@ interface Schedule {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  /** Summary of the class, included on the org-wide listing. */
+  class?: ClassRecord;
 }
 
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -219,8 +221,7 @@ function CreateScheduleForm({
     } catch (err) {
       // Room/instructor conflicts come back as 400s with a descriptive message
       // from SchedulesService — surface it verbatim rather than re-deriving it.
-      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined;
-      setServerError(message ?? 'Could not create the schedule. Check your connection and try again.');
+      setServerError(errorMessage(err, 'Could not create the schedule. Check your connection and try again.'));
     }
   };
 
@@ -550,42 +551,43 @@ export default function SchedulesPage() {
   }, []);
 
   const canCreate = hasPermission('schedules.create');
+  const canClasses = hasPermission('classes.view');
 
-  const {
-    data: classes = [],
-    isLoading: classesLoading,
-    isError: classesError,
-  } = useQuery<ClassRecord[]>({
+  // The whole week in one request; each row carries its class summary.
+  const schedulesQuery = useQuery<Schedule[]>({
+    queryKey: ['schedules', 'all'],
+    queryFn: async () => (await apiClient.get('/v1/schedules')).data,
+  });
+  const schedulesLoading = schedulesQuery.isLoading;
+  const schedulesError = schedulesQuery.isError;
+
+  // The class list (so unscheduled classes show too) needs classes.view.
+  // Without it, the classes are the ones that appear on the timetable.
+  const classesQuery = useQuery<ClassRecord[]>({
     queryKey: ['classes'],
     queryFn: async () => (await apiClient.get('/v1/classes')).data,
+    enabled: canClasses,
   });
-
-  // The API scopes schedules per class, so the org-wide week is one query per
-  // class — each cached under the same key the old single-class view used.
-  const scheduleQueries = useQueries({
-    queries: classes.map((cls) => ({
-      queryKey: ['schedules', cls.id],
-      queryFn: async (): Promise<Schedule[]> =>
-        (await apiClient.get('/v1/schedules', { params: { classId: cls.id } })).data,
-    })),
-  });
-
-  const schedulesLoading = scheduleQueries.some((q) => q.isLoading);
-  const schedulesError = scheduleQueries.some((q) => q.isError);
+  const classes: ClassRecord[] = canClasses
+    ? (classesQuery.data ?? [])
+    : [
+        ...new Map(
+          (schedulesQuery.data ?? []).flatMap((s) => (s.class ? [[s.class.id, s.class] as const] : [])),
+        ).values(),
+      ];
+  const classesLoading = canClasses ? classesQuery.isLoading : schedulesLoading;
+  const classesError = canClasses ? classesQuery.isError : schedulesError;
 
   const classColors = classes.map((cls, i) => ({ cls, color: CLASS_HUES[i % CLASS_HUES.length] }));
+  const colorOf = new Map(classColors.map(({ cls, color }) => [cls.id, { cls, color }]));
 
   // A week of meeting times is a few dozen rows at most — cheap enough to
-  // derive every render rather than memoize over a per-render query array.
-  const sessions: Session[] = classColors.flatMap(({ cls, color }, i) =>
-    (scheduleQueries[i]?.data ?? []).map((s) => ({
-      ...s,
-      cls,
-      color,
-      start: toMinutes(s.startTime),
-      end: toMinutes(s.endTime),
-    })),
-  );
+  // derive every render.
+  const sessions: Session[] = (schedulesQuery.data ?? []).flatMap((s) => {
+    const entry = colorOf.get(s.classId);
+    if (!entry) return [];
+    return [{ ...s, cls: entry.cls, color: entry.color, start: toMinutes(s.startTime), end: toMinutes(s.endTime) }];
+  });
 
   const sessionsByClass = new Map<string, Session[]>();
   for (const s of sessions) sessionsByClass.set(s.classId, [...(sessionsByClass.get(s.classId) ?? []), s]);
@@ -614,6 +616,7 @@ export default function SchedulesPage() {
         description="Weekly meeting times for each class, with room and instructor conflict checks."
         action={
           canCreate &&
+          canClasses &&
           classes.length > 0 && (
             <Button onClick={() => openForm()} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
               {icons.plus}

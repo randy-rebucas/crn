@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { EnrollmentStatus } from '@prisma/client';
+import { EnrollmentStatus, InvoiceStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -88,6 +88,22 @@ export class EnrollmentsService {
       throw new BadRequestException(
         `Cannot move enrollment from ${enrollment.status} to ${nextStatus}`,
       );
+    }
+
+    // "Payment verified" must reflect money a cashier actually verified in
+    // Finance — otherwise enrollments.update alone would bypass payments.verify.
+    if (nextStatus === EnrollmentStatus.PAYMENT_VERIFIED) {
+      const verifiedPayments = await this.prisma.payment.count({
+        where: {
+          status: PaymentStatus.VERIFIED,
+          invoice: { enrollmentId: id, status: { not: InvoiceStatus.CANCELLED } },
+        },
+      });
+      if (verifiedPayments === 0) {
+        throw new BadRequestException(
+          'This enrollment has no verified payment yet. Record the payment in Finance and have it verified first.',
+        );
+      }
     }
 
     const updated = await this.prisma.enrollment.update({

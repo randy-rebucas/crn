@@ -234,7 +234,7 @@ export function InvoicesTab({ createOpen, onCloseCreate }: { createOpen: boolean
               options={[
                 { id: 'all', label: 'All', count: counts.all },
                 { id: 'open', label: 'Open', count: counts.open },
-                { id: 'overdue', label: 'Overdue', count: counts.overdue, tone: 'alert' },
+                { id: 'overdue', label: 'Overdue', count: counts.overdue, alert: true },
                 { id: 'PAID', label: 'Paid', count: counts.PAID },
                 ...(counts.CANCELLED ? [{ id: 'CANCELLED' as const, label: 'Cancelled', count: counts.CANCELLED }] : []),
               ]}

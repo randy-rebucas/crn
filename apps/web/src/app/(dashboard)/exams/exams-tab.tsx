@@ -71,10 +71,12 @@ function Switch({ checked, onChange, label, description }: { checked: boolean; o
 }
 
 function CreateExamForm({ onCreated }: { onCreated: (id: string) => void }) {
+  const { hasPermission } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const { data: programs } = useQuery<Program[]>({
     queryKey: ['programs'],
     queryFn: async () => (await apiClient.get('/v1/programs')).data,
+    enabled: hasPermission('programs.view'),
   });
   const {
     register,
@@ -131,7 +133,14 @@ function CreateExamForm({ onCreated }: { onCreated: (id: string) => void }) {
                     key={t}
                     className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 has-[:checked]:border-red-700 has-[:checked]:bg-red-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-red-600"
                   >
-                    <input type="radio" className="sr-only" checked={field.value === t} onChange={() => field.onChange(t)} />
+                    <input
+                      type="radio"
+                      name={field.name}
+                      value={t}
+                      className="sr-only"
+                      checked={field.value === t}
+                      onChange={() => field.onChange(t)}
+                    />
                     <span className="block text-sm font-medium text-slate-900">{EXAM_TYPE_META[t].label}</span>
                     <span className="block text-xs text-slate-500">{EXAM_TYPE_META[t].hint}</span>
                   </label>
@@ -215,6 +224,11 @@ function CreateExamForm({ onCreated }: { onCreated: (id: string) => void }) {
 // Builder
 // ---------------------------------------------------------------------------
 
+/** Still being authored: not yet published, and not retired to the archive. */
+function isDraft(status: Exam['status']) {
+  return status !== 'PUBLISHED' && status !== 'ARCHIVED';
+}
+
 function ExamBuilder({ examId }: { examId: string }) {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -228,7 +242,8 @@ function ExamBuilder({ examId }: { examId: string }) {
     queryKey: ['exams', examId],
     queryFn: async () => (await apiClient.get(`/v1/exams/${examId}`)).data,
   });
-  const draft = exam?.status !== 'PUBLISHED';
+  // Only unpublished, unarchived exams can still be edited or published.
+  const draft = exam ? isDraft(exam.status) : false;
   const bank = useAllQuestions();
 
   const refresh = () => {
@@ -236,7 +251,8 @@ function ExamBuilder({ examId }: { examId: string }) {
   };
   const add = useMutation({
     mutationFn: ({ questionId, pts }: { questionId: string; pts: number }) =>
-      apiClient.post(`/v1/exams/${examId}/questions`, { questionId, points: pts, position: (exam?.questions.length ?? 0) + 1 }),
+      // Position is left to the API, which appends after the current last one.
+      apiClient.post(`/v1/exams/${examId}/questions`, { questionId, points: pts }),
     onMutate: () => setError(null),
     onSuccess: refresh,
     onError: (err) => setError(extractError(err, 'Could not add that question.')),
@@ -441,9 +457,11 @@ function ExamBuilder({ examId }: { examId: string }) {
 // Tab
 // ---------------------------------------------------------------------------
 
-type ExamFilter = 'all' | 'draft' | 'PUBLISHED';
+type ExamFilter = 'all' | 'draft' | 'PUBLISHED' | 'ARCHIVED';
 
 export function ExamsTab({ createOpen, onCloseCreate }: { createOpen: boolean; onCloseCreate: () => void }) {
+  const { hasPermission } = useAuth();
+  const canSeeResults = hasPermission('exams.grade');
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery<Exam[]>({
     queryKey: ['exams'],
@@ -456,12 +474,13 @@ export function ExamsTab({ createOpen, onCloseCreate }: { createOpen: boolean; o
 
   const counts: Record<ExamFilter, number> = {
     all: exams.length,
-    draft: exams.filter((e) => e.status !== 'PUBLISHED').length,
+    draft: exams.filter((e) => isDraft(e.status)).length,
     PUBLISHED: exams.filter((e) => e.status === 'PUBLISHED').length,
+    ARCHIVED: exams.filter((e) => e.status === 'ARCHIVED').length,
   };
   const visible = exams.filter(
     (e) =>
-      (filter === 'all' || (filter === 'draft' ? e.status !== 'PUBLISHED' : e.status === 'PUBLISHED')) &&
+      (filter === 'all' || (filter === 'draft' ? isDraft(e.status) : e.status === filter)) &&
       (!search.trim() || e.title.toLowerCase().includes(search.trim().toLowerCase())),
   );
 
@@ -498,6 +517,7 @@ export function ExamsTab({ createOpen, onCloseCreate }: { createOpen: boolean; o
                 { id: 'all', label: 'All', count: counts.all },
                 { id: 'draft', label: 'Drafts', count: counts.draft },
                 { id: 'PUBLISHED', label: 'Published', count: counts.PUBLISHED },
+                ...(counts.ARCHIVED ? [{ id: 'ARCHIVED' as const, label: 'Archived', count: counts.ARCHIVED }] : []),
               ]}
             />
             <SearchBox value={search} onChange={setSearch} placeholder="Search exams" />
@@ -529,7 +549,7 @@ export function ExamsTab({ createOpen, onCloseCreate }: { createOpen: boolean; o
                   {visible.map((exam) => {
                     const qCount = exam._count?.questions;
                     const attempts = exam._count?.attempts ?? 0;
-                    const published = exam.status === 'PUBLISHED';
+                    const editable = isDraft(exam.status);
                     return (
                       <tr key={exam.id} className="transition-colors hover:bg-slate-50">
                         <td className="px-4 py-3">
@@ -562,7 +582,7 @@ export function ExamsTab({ createOpen, onCloseCreate }: { createOpen: boolean; o
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-1.5">
-                            {attempts > 0 && (
+                            {attempts > 0 && canSeeResults && (
                               <Link
                                 href="/results"
                                 className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
@@ -574,10 +594,10 @@ export function ExamsTab({ createOpen, onCloseCreate }: { createOpen: boolean; o
                               type="button"
                               onClick={() => setOpenId(exam.id)}
                               className={`rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 ${
-                                published ? 'border border-slate-200 text-slate-700 hover:bg-slate-100' : 'bg-red-700 text-white hover:bg-red-800'
+                                editable ? 'bg-red-700 text-white hover:bg-red-800' : 'border border-slate-200 text-slate-700 hover:bg-slate-100'
                               }`}
                             >
-                              {published ? 'View' : 'Build'}
+                              {editable ? 'Build' : 'View'}
                             </button>
                           </div>
                         </td>

@@ -17,6 +17,7 @@ import {
   YAxis,
 } from 'recharts';
 import { apiClient } from '@/lib/api-client';
+import { humanize } from '@/lib/format';
 import { Button, Card, PageHeader } from '@/components/ui';
 import { icons as baseIcons } from '@/components/student-ui';
 import { adminIcons } from '@/components/admin-shell';
@@ -102,11 +103,6 @@ function pesos(cents: number) {
 
 function pesosCompact(cents: number) {
   return `₱${(cents / 100).toLocaleString('en-PH', { notation: 'compact', maximumFractionDigits: 1 })}`;
-}
-
-function humanize(status: string) {
-  const text = status.replace(/_/g, ' ').toLowerCase();
-  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function percent(part: number, whole: number) {

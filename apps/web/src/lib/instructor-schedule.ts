@@ -20,6 +20,14 @@ export function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// An attendance record's session day. The API stores the marked calendar
+// day ("YYYY-MM-DD", sent by attendance-view) as midnight UTC, so the UTC
+// date part *is* the day — converting through local time would shift it a
+// day for anyone west of Greenwich.
+export function recordDayKey(r: Pick<AttendanceRecord, 'date'>) {
+  return r.date.slice(0, 10);
+}
+
 export interface AgendaItem {
   key: string;
   date: Date;
@@ -73,8 +81,9 @@ export function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// PRESENT and LATE both count as attended; EXCUSED counts against the
-// denominator so an excused absence doesn't inflate the rate.
+// PRESENT and LATE both count as attended. EXCUSED stays in the denominator
+// as not-attended: dropping it would inflate the rate for a class where many
+// students were excused.
 export function attendanceRate(records: AttendanceRecord[]) {
   if (records.length === 0) return null;
   const attended = records.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;

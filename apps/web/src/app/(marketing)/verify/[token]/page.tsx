@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { API_BASE_URL } from '@/lib/api-client';
+import { formatDate } from '@/lib/format';
 
 // Public certificate check, the page behind a student's verification link.
 // GET /v1/certificates/verify/:qrToken needs no auth and returns only the
@@ -102,7 +103,7 @@ export default async function VerifyCertificatePage({ params }: { params: Promis
                       <dt className="text-slate-500">Issued</dt>
                       <dd className="mt-0.5 font-semibold text-slate-900">
                         <time dateTime={result.cert.issuedAt}>
-                          {new Date(result.cert.issuedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {formatDate(result.cert.issuedAt, { month: 'long', day: 'numeric', year: 'numeric' })}
                         </time>
                       </dd>
                     </div>

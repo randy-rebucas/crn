@@ -2,13 +2,13 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -214,8 +214,7 @@ function CreateStudentForm({
       });
       onCreated();
     } catch (err) {
-      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined;
-      setServerError(message ?? 'Could not create the student. Check your connection and try again.');
+      setServerError(errorMessage(err, 'Could not create the student. Check your connection and try again.'));
     }
   };
 

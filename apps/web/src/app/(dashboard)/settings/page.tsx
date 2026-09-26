@@ -2,11 +2,11 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { useMemo, useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch, type Control } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import { Button, Card, ErrorState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui';
 import { adminIcons } from '@/components/admin-shell';
@@ -55,12 +55,6 @@ const CURRENCIES = [
   { code: 'AED', label: 'AED · UAE dirham' },
   { code: 'SAR', label: 'SAR · Saudi riyal' },
 ];
-
-function errorMessage(err: unknown, fallback: string) {
-  if (!isAxiosError<{ message?: string | string[] }>(err)) return fallback;
-  const message = err.response?.data?.message;
-  return (Array.isArray(message) ? message.join('. ') : message) ?? fallback;
-}
 
 const prefix = z
   .string()

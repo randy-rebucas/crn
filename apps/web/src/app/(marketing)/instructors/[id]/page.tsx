@@ -1,29 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { API_BASE_URL } from '@/lib/api-client';
-
-interface PublicInstructor {
-  id: string;
-  bio: string | null;
-  specialization: string | null;
-  user: { firstName: string; lastName: string };
-}
-
-async function getInstructor(id: string): Promise<PublicInstructor | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/instructors/${id}`, { next: { revalidate: 60 } });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+import { excerpt, getInstructor } from '@/lib/public-api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const instructor = await getInstructor(id);
-  return { title: instructor ? `${instructor.user.firstName} ${instructor.user.lastName}` : 'Instructor' };
+  if (!instructor) return { title: 'Instructor' };
+  const name = `${instructor.user.firstName} ${instructor.user.lastName}`;
+  const summary = [instructor.specialization, instructor.bio && excerpt(instructor.bio, 120)].filter(Boolean).join(' — ');
+  return {
+    title: name,
+    description: summary || `${name}, review instructor at OBIAS Nursing & Allied Courses Review Center.`,
+  };
 }
 
 export default async function InstructorProfilePage({ params }: { params: Promise<{ id: string }> }) {

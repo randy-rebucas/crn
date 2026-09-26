@@ -17,9 +17,13 @@ export class CertificatesService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  findAllForOrganization(user: AuthenticatedUser) {
+  findAllForOrganization(user: AuthenticatedUser, studentId?: string) {
     return this.prisma.certificate.findMany({
-      where: { organizationId: user.organizationId, ...certificateScopeWhere(user, 'certificates.view') },
+      where: {
+        organizationId: user.organizationId,
+        ...certificateScopeWhere(user, 'certificates.view'),
+        ...(studentId ? { AND: [{ studentId }] } : {}),
+      },
       include: { program: { select: { name: true } } },
       orderBy: { issuedAt: 'desc' },
     });

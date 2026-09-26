@@ -2,13 +2,13 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -80,10 +80,6 @@ function pesos(amount: number, currency: string) {
 
 function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
 }
 
 const icons = {

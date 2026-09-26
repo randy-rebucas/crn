@@ -5,18 +5,31 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { RolesService } from './roles.service.js';
+import { PermissionsService } from '../permissions/permissions.service.js';
 import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
 
 @Controller('v1/roles')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RolesController {
-  constructor(private readonly roles: RolesService) {}
+  constructor(
+    private readonly roles: RolesService,
+    private readonly permissions: PermissionsService,
+  ) {}
 
   @Get()
   @RequirePermissions('roles.manage')
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.roles.findAllForOrganization(user.organizationId);
+  }
+
+  // The permission catalog a role can be built from. Lives here as well as
+  // under /v1/permissions (which needs permissions.manage) so holding
+  // roles.manage alone is enough to create and edit roles.
+  @Get('permission-catalog')
+  @RequirePermissions('roles.manage')
+  permissionCatalog() {
+    return this.permissions.findAll();
   }
 
   @Post()

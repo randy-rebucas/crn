@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { humanize } from '@/lib/format';
 import { useAuth } from '@/lib/auth-context';
 import { Card, EmptyState, ErrorState, PageHeader } from '@/components/ui';
 import { icons as baseIcons } from '@/components/student-ui';
@@ -148,11 +149,6 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   audit_logs: adminIcons.history,
   reports: adminIcons.pieChart,
 };
-
-function humanize(value: string) {
-  const text = value.replace(/_/g, ' ').toLowerCase();
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 // The catalog has no descriptions yet, so derive a readable sentence from
 // the key: "enrollments.approve" -> "Approve enrollments".

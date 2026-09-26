@@ -76,6 +76,7 @@ export default function ExamsPage() {
   const exams = examsQuery.data ?? [];
   const questions = questionsQuery.data ?? [];
   const published = exams.filter((e) => e.status === 'PUBLISHED').length;
+  const drafts = exams.filter((e) => e.status !== 'PUBLISHED' && e.status !== 'ARCHIVED').length;
   const usable = questions.filter((q) => q.status === 'APPROVED' || q.status === 'PUBLISHED').length;
   const inReview = questions.filter((q) => q.status === 'REVIEW').length;
   const attempts = exams.reduce((s, e) => s + (e._count?.attempts ?? 0), 0);
@@ -111,7 +112,7 @@ export default function ExamsPage() {
           tone="bg-red-700 text-white"
           label="Exams"
           value={loading ? '…' : String(exams.length)}
-          detail={`${published} published · ${exams.length - published} draft${exams.length - published === 1 ? '' : 's'}`}
+          detail={`${published} published · ${drafts} draft${drafts === 1 ? '' : 's'}`}
           onClick={() => setTab('exams')}
         />
         <Tile

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { fetchPublicSettings } from '@/lib/public-settings';
 
 export const metadata: Metadata = {
   title: 'About Us',
@@ -7,7 +8,9 @@ export const metadata: Metadata = {
     '20+ years preparing nursing and allied-health graduates for their board licensure exams in Las Piñas City.',
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const { address } = await fetchPublicSettings();
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-16">
       <h1 className="font-heading text-3xl font-bold text-slate-900">About OBIAS</h1>
@@ -25,10 +28,15 @@ export default function AboutPage() {
       <h2 className="mt-10 font-heading text-xl font-semibold text-slate-900">Our Mission</h2>
       <p className="mt-2 text-slate-600">&ldquo;Your Success Is Our Mission!&rdquo;</p>
 
-      <h2 className="mt-10 font-heading text-xl font-semibold text-slate-900">Visit Us</h2>
-      <p className="mt-2 text-slate-600">
-        Jinyang Bldg. #1, Manila Doctors Access Road, Almanza Uno, Las Piñas City
-      </p>
+      {address && (
+        <>
+          <h2 className="mt-10 font-heading text-xl font-semibold text-slate-900">Visit Us</h2>
+          <p className="mt-2 text-slate-600">{address}</p>
+          <Link href="/locations" className="mt-2 inline-block text-sm font-semibold text-brand-maroon hover:underline">
+            Directions &amp; contact numbers &rarr;
+          </Link>
+        </>
+      )}
 
       <div className="mt-10">
         <Link

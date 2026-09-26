@@ -69,7 +69,15 @@ function RequestRefundForm({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const { data: payments, isLoading } = useAllPayments();
-  const verified = (payments ?? []).filter((p) => p.status === 'VERIFIED');
+  const refundsQuery = useRefunds();
+  // Refunds still in play (not rejected) already use up part of a payment;
+  // the API refuses a request that would push the total past what was paid.
+  const committed = new Map<string, number>();
+  for (const r of refundsQuery.data ?? []) {
+    if (r.status !== 'REJECTED') committed.set(r.paymentId, (committed.get(r.paymentId) ?? 0) + r.amount);
+  }
+  const refundableOf = (p: { id: string; amount: number }) => Math.max(p.amount - (committed.get(p.id) ?? 0), 0);
+  const verified = (payments ?? []).filter((p) => p.status === 'VERIFIED' && refundableOf(p) > 0);
 
   const {
     register,
@@ -106,7 +114,7 @@ function RequestRefundForm({ onDone }: { onDone: () => void }) {
             required: 'Choose the payment to refund',
             onChange: (e) => {
               const p = verified.find((x) => x.id === e.target.value);
-              if (p) setValue('amount', centsToInput(p.amount));
+              if (p) setValue('amount', centsToInput(refundableOf(p)));
             },
           })}
           disabled={isLoading}
@@ -116,6 +124,7 @@ function RequestRefundForm({ onDone }: { onDone: () => void }) {
             <option key={p.id} value={p.id}>
               {personName(p.invoice?.enrollment.student.user)} · {money(p.amount)} {humanize(p.method)}
               {p.receipt ? ` · ${p.receipt.receiptNumber}` : ''}
+              {refundableOf(p) < p.amount ? ` · ${money(refundableOf(p))} left to refund` : ''}
             </option>
           ))}
         </Select>
@@ -127,7 +136,11 @@ function RequestRefundForm({ onDone }: { onDone: () => void }) {
             validate: (v) => {
               const cents = toCents(v);
               if (Number.isNaN(cents) || cents <= 0) return 'Enter an amount like 2500 or 2,500.00';
-              if (selected && cents > selected.amount) return `Can't refund more than the ${money(selected.amount)} paid`;
+              if (selected && cents > refundableOf(selected)) {
+                return refundableOf(selected) < selected.amount
+                  ? `Only ${money(refundableOf(selected))} of this payment is left to refund`
+                  : `Can't refund more than the ${money(selected.amount)} paid`;
+              }
               return true;
             },
           })}
@@ -242,7 +255,7 @@ export function RefundsTab({ createOpen, onCloseCreate }: { createOpen: boolean;
               value={activeFilter}
               onChange={setFilter}
               options={[
-                { id: 'action', label: 'Needs my action', count: counts.action, tone: 'alert' },
+                { id: 'action', label: 'Needs my action', count: counts.action, alert: true },
                 { id: 'open', label: 'In progress', count: counts.open },
                 { id: 'done', label: 'Closed', count: counts.done },
                 { id: 'all', label: 'All', count: counts.all },

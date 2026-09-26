@@ -45,9 +45,26 @@ export class SchedulesService {
     });
   }
 
-  findAllForClass(organizationId: string, classId: string) {
+  // `classId` omitted = the whole organization's week in one query (the
+  // timetable page used to issue one request per class). Each row carries a
+  // summary of its class so the timetable can label sessions even for a
+  // viewer who holds schedules.view but not classes.view.
+  findAllForClass(organizationId: string, classId?: string) {
     return this.prisma.schedule.findMany({
       where: { classId, class: { branch: { organizationId } } },
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            course: { select: { name: true, code: true } },
+            batch: { select: { name: true } },
+            room: { select: { name: true, capacity: true } },
+            instructor: { select: { user: { select: { firstName: true, lastName: true } } } },
+          },
+        },
+      },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
   }

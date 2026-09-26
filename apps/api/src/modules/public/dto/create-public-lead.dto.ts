@@ -12,6 +12,9 @@ export class CreatePublicLeadDto {
   @IsEmail()
   email?: string;
 
+  // At least one of phone/email is required; PublicService.createLead
+  // enforces that, since a conditional decorator here would also skip the
+  // length check.
   @IsOptional()
   @IsString()
   @MaxLength(40)
@@ -26,4 +29,12 @@ export class CreatePublicLeadDto {
   @IsString()
   @MaxLength(2000)
   message?: string;
+
+  // Honeypot: the website form hides this field from people, so a value
+  // means an automated submission. Accepted (so bots see success) but never
+  // stored — see PublicService.createLead.
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
 }

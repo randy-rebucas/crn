@@ -8,12 +8,22 @@ import {
   type InstructorClass,
   type RosterStudent,
   type Schedule,
+  useCanTakeAttendance,
   useMyAttendance,
   useMyClasses,
   useMyRosters,
   useMySchedules,
+  useNow,
 } from '@/lib/instructor-hooks';
-import { WEEKDAYS, attendanceRate, dayKey, formatTime, nextOccurrence, relativeDay } from '@/lib/instructor-schedule';
+import {
+  WEEKDAYS,
+  attendanceRate,
+  dayKey,
+  formatTime,
+  nextOccurrence,
+  recordDayKey,
+  relativeDay,
+} from '@/lib/instructor-schedule';
 import { Drawer, StatusBadge } from '@/components/ui';
 import { instructorIcons as icons } from '@/components/instructor-ui';
 
@@ -59,19 +69,19 @@ function WeekStrip({ schedules, tone, today }: { schedules: Schedule[]; tone: To
         const slots = schedules.filter((s) => s.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
         const has = slots.length > 0;
         const times = slots.map((s) => `${formatTime(s.startTime)}–${formatTime(s.endTime)}`).join(', ');
+        const description = `${label}${day === today ? ' (today)' : ''}: ${has ? times : 'no session'}`;
         return (
           <li
             key={label}
-            title={has ? `${label}: ${times}` : `${label}: no session`}
-            aria-label={has ? `${label}, ${times}` : `${label}, no session`}
+            title={description}
             className={`relative flex h-9 flex-col items-center justify-center rounded-lg text-[11px] font-semibold ${
               has ? tone.day : day === today ? 'bg-white text-slate-900 shadow-sm' : 'bg-slate-50 text-slate-400'
             }`}
           >
-            {label.charAt(0)}
-            <span className="sr-only">{label}</span>
+            <span aria-hidden>{label.charAt(0)}</span>
+            <span className="sr-only">{description}</span>
             {day === today && (
-              <span className={`absolute bottom-1 h-1 w-1 rounded-full ${has ? 'bg-current' : 'bg-red-600'}`} aria-label="Today" />
+              <span className={`absolute bottom-1 h-1 w-1 rounded-full ${has ? 'bg-current' : 'bg-red-600'}`} aria-hidden />
             )}
           </li>
         );
@@ -119,12 +129,13 @@ function ClassCard({
   onOpenRoster: () => void;
 }) {
   const { hasPermission } = useAuth();
+  const canMark = useCanTakeAttendance() && hasPermission('attendance.create');
   const next = nextOccurrence(schedules, now);
   const since = now.getTime() - 30 * 86_400_000;
   const recent = records.filter((r) => new Date(r.date).getTime() >= since);
   const rate = attendanceRate(recent);
-  const sessionsMarked = new Set(records.map((r) => r.date.slice(0, 10))).size;
-  const markedToday = records.some((r) => r.date.slice(0, 10) === dayKey(now));
+  const sessionsMarked = new Set(records.map(recordDayKey)).size;
+  const markedToday = records.some((r) => recordDayKey(r) === dayKey(now));
 
   return (
     <article className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
@@ -204,7 +215,7 @@ function ClassCard({
       </dl>
 
       <footer className="mt-auto flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-3.5">
-        {hasPermission('attendance.create') && (
+        {canMark && (
           <Link
             href={`/instructor/attendance?classId=${cls.id}`}
             className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -316,14 +327,14 @@ function RosterDrawer({
 // ---------------------------------------------------------------------------
 
 export default function InstructorClassesPage() {
-  const [now] = useState(() => new Date());
+  const now = useNow();
   const myClasses = useMyClasses();
   const classIds = useMemo(() => myClasses.classes.map((c) => c.id), [myClasses.classes]);
   const schedules = useMySchedules(classIds);
   const rosters = useMyRosters(classIds);
   const attendance = useMyAttendance(classIds);
 
-  const [status, setStatus] = useState<string>('ALL');
+  const [selectedStatus, setStatus] = useState<string>('ALL');
   // Kept after closing so the drawer's contents stay put while it slides out.
   const [rosterClassId, setRosterClassId] = useState<string | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -332,6 +343,9 @@ export default function InstructorClassesPage() {
     const present = new Set(myClasses.classes.map((c) => c.status));
     return STATUS_ORDER.filter((s) => present.has(s));
   }, [myClasses.classes]);
+  // If the chosen status stops existing (e.g. the last ACTIVE class completes
+  // on refetch), fall back to All rather than showing an unexplained blank.
+  const status = selectedStatus === 'ALL' || statuses.includes(selectedStatus) ? selectedStatus : 'ALL';
 
   const visible = status === 'ALL' ? myClasses.classes : myClasses.classes.filter((c) => c.status === status);
   const weeklySessions = schedules.schedules.length;
@@ -365,7 +379,7 @@ export default function InstructorClassesPage() {
       </div>
 
       {statuses.length > 1 && (
-        <div role="tablist" aria-label="Filter by status" className="mb-5 inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+        <div role="group" aria-label="Filter by status" className="mb-5 inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {['ALL', ...statuses].map((s) => {
             const count = s === 'ALL' ? myClasses.classes.length : myClasses.classes.filter((c) => c.status === s).length;
             const active = status === s;
@@ -373,8 +387,7 @@ export default function InstructorClassesPage() {
               <button
                 key={s}
                 type="button"
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 onClick={() => setStatus(s)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition focus-visible:outline-2 focus-visible:outline-red-700 ${
                   active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'

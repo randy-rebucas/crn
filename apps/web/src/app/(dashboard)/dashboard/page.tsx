@@ -55,6 +55,7 @@ interface StudentRow {
 interface CourseRow {
   id: string;
   createdAt: string;
+  status?: string;
 }
 
 interface ExamPerformanceRow {
@@ -277,7 +278,7 @@ function EnrollmentByProgramChart({ data, total }: { data: { name: string; count
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <div className="text-xl font-bold text-slate-900">{total}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-400">Students</div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-400">Enrollments</div>
         </div>
       </div>
       <ul className="min-w-0 flex-1 space-y-2">
@@ -307,6 +308,10 @@ const SHORTCUTS: { label: string; href: string; permission: string; icon: React.
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
 
+  // Cache keys match the pages these lists come from (Students, Courses,
+  // Enrollments, Reports, Audit Logs), so the dashboard and those pages share
+  // one fetch instead of each downloading the same data.
+
   const canReports = hasPermission('reports.view');
   const canStudents = hasPermission('students.view');
   const canCourses = hasPermission('courses.view');
@@ -314,42 +319,42 @@ export default function DashboardPage() {
   const canAudit = hasPermission('audit_logs.view');
 
   const studentsQuery = useQuery<StudentRow[]>({
-    queryKey: ['dashboard', 'students'],
+    queryKey: ['students'],
     queryFn: async () => (await apiClient.get('/v1/students')).data,
     enabled: canStudents,
   });
   const coursesQuery = useQuery<CourseRow[]>({
-    queryKey: ['dashboard', 'courses'],
+    queryKey: ['courses', 'all'],
     queryFn: async () => (await apiClient.get('/v1/courses')).data,
     enabled: canCourses,
   });
   const attemptsTrendQuery = useQuery<MonthlyPoint[]>({
-    queryKey: ['dashboard', 'attempts-trend'],
+    queryKey: ['reports', 'attempts-trend'],
     queryFn: async () => (await apiClient.get('/v1/reports/attempts-trend')).data,
     enabled: canReports,
   });
   const funnelQuery = useQuery<EnrollmentFunnelRow[]>({
-    queryKey: ['dashboard', 'enrollment-funnel'],
+    queryKey: ['reports', 'enrollment-funnel'],
     queryFn: async () => (await apiClient.get('/v1/reports/enrollment-funnel')).data,
     enabled: canReports,
   });
   const revenueQuery = useQuery<RevenueSummary>({
-    queryKey: ['dashboard', 'revenue'],
+    queryKey: ['reports', 'revenue'],
     queryFn: async () => (await apiClient.get('/v1/reports/revenue')).data,
     enabled: canReports,
   });
   const examPerfQuery = useQuery<ExamPerformanceRow[]>({
-    queryKey: ['dashboard', 'exam-performance'],
+    queryKey: ['reports', 'exam-performance'],
     queryFn: async () => (await apiClient.get('/v1/reports/exam-performance')).data,
     enabled: canReports,
   });
   const recentEnrollmentsQuery = useQuery<RecentEnrollment[]>({
-    queryKey: ['dashboard', 'recent-enrollments'],
+    queryKey: ['enrollments'],
     queryFn: async () => (await apiClient.get('/v1/enrollments')).data,
     enabled: canEnrollments,
   });
   const activityQuery = useQuery<AuditLogEntry[]>({
-    queryKey: ['dashboard', 'activity'],
+    queryKey: ['audit-logs', {}],
     queryFn: async () => (await apiClient.get('/v1/audit-logs')).data,
     enabled: canAudit,
   });
@@ -376,9 +381,14 @@ export default function DashboardPage() {
     () => (studentsQuery.data ? buildMonthlyCounts(studentsQuery.data) : []),
     [studentsQuery.data],
   );
-  const coursesTrend = useMemo(
-    () => (coursesQuery.data ? buildMonthlyCounts(coursesQuery.data) : []),
+  // Only published courses are live for students; drafts don't count.
+  const publishedCourses = useMemo(
+    () => coursesQuery.data?.filter((c) => !c.status || c.status === 'PUBLISHED'),
     [coursesQuery.data],
+  );
+  const coursesTrend = useMemo(
+    () => (publishedCourses ? buildMonthlyCounts(publishedCourses) : []),
+    [publishedCourses],
   );
 
   const hasAnyWidget = canReports || canStudents || canCourses || canEnrollments || canAudit || visibleShortcuts.length > 0;
@@ -389,7 +399,7 @@ export default function DashboardPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <PageHeader
-          title={`Welcome back, ${user?.email ?? ''}!`}
+          title={`Welcome back, ${user?.firstName || user?.email || ''}!`}
           description="Here's what's happening with your review platform today."
         />
         <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-right shadow-sm">
@@ -422,8 +432,8 @@ export default function DashboardPage() {
           {canCourses && (
             <StatCard
               icon={baseIcons.learn}
-              label="Active Courses"
-              value={coursesQuery.data?.length ?? '—'}
+              label="Published Courses"
+              value={publishedCourses?.length ?? '—'}
               isError={coursesQuery.isError}
               tone="amber"
               trend={coursesTrend}
@@ -561,7 +571,7 @@ export default function DashboardPage() {
                         <tr key={row.examId} className="border-b border-slate-50 last:border-0">
                           <td className="py-2 text-slate-700">{row.title}</td>
                           <td className="py-2 text-slate-500">{row.attempts}</td>
-                          <td className="py-2 text-slate-500">{row.averageScorePct ?? '—'}%</td>
+                          <td className="py-2 text-slate-500">{row.averageScorePct == null ? '—' : `${row.averageScorePct}%`}</td>
                           <td className="py-2 w-40">
                             {row.passRate === null ? '—' : <ProgressBar value={row.passRate} max={100} tone="green" />}
                           </td>

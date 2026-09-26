@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -100,16 +101,13 @@ export class PublicService {
     return program;
   }
 
-  // Every instructor at the organization, not gated by a publish workflow —
-  // instructor profiles have no ContentStatus (see the audit finding that
-  // flagged this): unlike Program/Course, there's no draft/review concept
-  // for "is this person's bio ready to show publicly" yet, so this exposes
-  // every ACTIVE instructor's profile. Revisit if that granularity is ever
-  // needed (e.g. an isPublic flag on InstructorProfile).
+  // Only profiles staff have opted in (isPublic) and whose account is still
+  // ACTIVE: being on the teaching roster doesn't mean agreeing to appear on
+  // the public website.
   async findInstructors() {
     const organizationId = await this.resolveOrganizationId();
     return this.prisma.instructorProfile.findMany({
-      where: { organizationId, user: { status: 'ACTIVE' } },
+      where: { organizationId, isPublic: true, user: { status: 'ACTIVE' } },
       select: {
         id: true,
         bio: true,
@@ -123,7 +121,7 @@ export class PublicService {
   async findInstructor(id: string) {
     const organizationId = await this.resolveOrganizationId();
     const instructor = await this.prisma.instructorProfile.findFirst({
-      where: { id, organizationId, user: { status: 'ACTIVE' } },
+      where: { id, organizationId, isPublic: true, user: { status: 'ACTIVE' } },
       select: {
         id: true,
         bio: true,
@@ -197,6 +195,14 @@ export class PublicService {
   }
 
   async createLead(dto: CreatePublicLeadDto) {
+    // Honeypot tripped: answer exactly like a real submission so the bot
+    // gets no signal, but don't create a lead.
+    if (dto.website) return { id: randomUUID(), received: true };
+    // A lead nobody can reach is useless to staff.
+    if (!dto.phone?.trim() && !dto.email?.trim()) {
+      throw new BadRequestException('Provide a phone number or an email address so we can reach you.');
+    }
+
     const organizationId = await this.resolveOrganizationId();
     // actorId omitted: no authenticated user exists for an anonymous
     // website submission, and AuditLog.actorId is nullable for exactly

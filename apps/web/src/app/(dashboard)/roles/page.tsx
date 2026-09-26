@@ -2,12 +2,13 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { errorMessage } from '@/lib/errors';
+import { humanize } from '@/lib/format';
 import {
   Button,
   Card,
@@ -75,9 +76,14 @@ interface Role {
 
 type RoleFilter = 'all' | 'system' | 'custom';
 
-function humanize(value: string) {
-  const text = value.replace(/[_.-]+/g, ' ').toLowerCase();
-  return text.charAt(0).toUpperCase() + text.slice(1);
+// Mirrors SOD_CONFLICTS in apps/api/src/modules/roles/roles.service.ts — the
+// API refuses a role holding both; flagging it here saves a failed save.
+const SOD_PAIRS: [string, string][] = [['refunds.officer_approve', 'refunds.manager_approve']];
+
+/** Scopes at or narrower than `held` — the most the current user may grant. */
+function scopesUpTo(held: PermissionScope | undefined): PermissionScope[] {
+  if (!held) return [];
+  return PERMISSION_SCOPES.slice(PERMISSION_SCOPES.indexOf(held));
 }
 
 function slugify(value: string) {
@@ -168,11 +174,13 @@ function GroupCheckbox({
   indeterminate,
   onChange,
   label,
+  disabled,
 }: {
   checked: boolean;
   indeterminate: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -184,8 +192,9 @@ function GroupCheckbox({
       type="checkbox"
       aria-label={label}
       checked={checked}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
-      className="h-4 w-4 cursor-pointer accent-red-700"
+      className="h-4 w-4 cursor-pointer accent-red-700 disabled:cursor-not-allowed"
     />
   );
 }
@@ -202,6 +211,13 @@ function RoleForm({
   onSaved: () => void;
 }) {
   const editing = Boolean(role);
+  const { user } = useAuth();
+  // The API only lets someone grant a permission they hold, at their own
+  // scope or narrower — so only offer those.
+  const heldScope = useMemo(
+    () => new Map((user?.permissions ?? []).map((p) => [p.key, p.scope as PermissionScope])),
+    [user],
+  );
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedScopes, setSelectedScopes] = useState<Record<string, PermissionScope>>(() =>
     Object.fromEntries((role?.permissions ?? []).map((rp) => [rp.permission.key, rp.scope])),
@@ -237,18 +253,37 @@ function RoleForm({
     setSelectedScopes((prev) => {
       const next = { ...prev };
       for (const key of keys) {
-        if (checked) next[key] = next[key] ?? defaultScope;
-        else delete next[key];
+        const allowed = scopesUpTo(heldScope.get(key));
+        if (checked) {
+          if (allowed.length === 0) continue;
+          // Clamp the default to the widest scope this user may grant.
+          next[key] = next[key] ?? (allowed.includes(defaultScope) ? defaultScope : allowed[0]);
+        } else {
+          delete next[key];
+        }
       }
       return next;
     });
   };
+
+  const sodConflict = SOD_PAIRS.find(([a, b]) => a in selectedScopes && b in selectedScopes);
+  const ungrantable = Object.entries(selectedScopes).filter(
+    ([key, scope]) => !scopesUpTo(heldScope.get(key)).includes(scope),
+  );
 
   const onSubmit = async (values: CreateRoleValues) => {
     setServerError(null);
     const permissionEntries = Object.entries(selectedScopes);
     if (permissionEntries.length === 0) {
       setServerError('Pick at least one permission for this role.');
+      return;
+    }
+    if (sodConflict) {
+      setServerError(`A role can't hold both ${sodConflict[0]} and ${sodConflict[1]} (separation of duties).`);
+      return;
+    }
+    if (ungrantable.length > 0) {
+      setServerError(`You can't grant ${ungrantable.map(([k]) => k).join(', ')} at the selected scope.`);
       return;
     }
     const grants = permissionEntries.map(([permissionKey, scope]) => ({ permissionKey, scope }));
@@ -272,11 +307,7 @@ function RoleForm({
       }
       onSaved();
     } catch (err) {
-      const message = isAxiosError<{ message?: string | string[] }>(err) ? err.response?.data?.message : undefined;
-      setServerError(
-        (Array.isArray(message) ? message.join('. ') : message) ??
-          `Could not ${role ? 'save' : 'create'} the role. Check the details and try again.`,
-      );
+      setServerError(errorMessage(err, `Could not ${role ? 'save' : 'create'} the role. Check the details and try again.`));
     }
   };
 
@@ -356,7 +387,7 @@ function RoleForm({
 
         <div className="space-y-3">
           {groups.map(([resource, items]) => {
-            const keys = items.map((p) => p.key);
+            const keys = items.map((p) => p.key).filter((k) => heldScope.has(k));
             const checkedCount = keys.filter((k) => k in selectedScopes).length;
             return (
               <fieldset key={resource} className="overflow-hidden rounded-lg border border-slate-200">
@@ -364,7 +395,8 @@ function RoleForm({
                 <div className="flex items-center gap-3 bg-slate-50 px-3 py-2">
                   <GroupCheckbox
                     label={`Select all ${humanize(resource)} permissions`}
-                    checked={checkedCount === keys.length}
+                    disabled={keys.length === 0}
+                    checked={keys.length > 0 && checkedCount === keys.length}
                     indeterminate={checkedCount > 0 && checkedCount < keys.length}
                     onChange={(checked) => setChecked(keys, checked)}
                   />
@@ -379,19 +411,29 @@ function RoleForm({
                   {items.map((permission) => {
                     const checked = permission.key in selectedScopes;
                     const inputId = `perm-${permission.id}`;
+                    const allowedScopes = scopesUpTo(heldScope.get(permission.key));
+                    const grantable = allowedScopes.length > 0;
+                    const scope = selectedScopes[permission.key];
+                    // An existing grant wider than the editor holds stays listed so it's visible.
+                    const scopeOptions = scope && !allowedScopes.includes(scope) ? [scope, ...allowedScopes] : allowedScopes;
                     return (
                       <li key={permission.id} className={`flex items-start gap-3 px-3 py-2.5 ${checked ? 'bg-red-50/40' : ''}`}>
                         <input
                           id={inputId}
                           type="checkbox"
                           checked={checked}
+                          disabled={!grantable && !checked}
                           onChange={(e) => setChecked([permission.key], e.target.checked)}
-                          className="mt-0.5 h-4 w-4 cursor-pointer accent-red-700"
+                          className="mt-0.5 h-4 w-4 cursor-pointer accent-red-700 disabled:cursor-not-allowed"
                         />
-                        <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer">
+                        <label
+                          htmlFor={inputId}
+                          className={`min-w-0 flex-1 ${grantable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                        >
                           <span className="block text-sm font-medium text-slate-900">{humanize(permission.action)}</span>
                           <span className="block text-xs text-slate-500">
                             {permission.description ?? permission.key}
+                            {!grantable && ' · you don’t hold this, so you can’t grant it'}
                           </span>
                         </label>
                         {checked && (
@@ -403,9 +445,9 @@ function RoleForm({
                                 setSelectedScopes((prev) => ({ ...prev, [permission.key]: e.target.value as PermissionScope }))
                               }
                             >
-                              {PERMISSION_SCOPES.map((scope) => (
-                                <option key={scope} value={scope}>
-                                  {humanize(scope)}
+                              {scopeOptions.map((s) => (
+                                <option key={s} value={s} disabled={!allowedScopes.includes(s)}>
+                                  {humanize(s)}
                                 </option>
                               ))}
                             </Select>
@@ -422,6 +464,16 @@ function RoleForm({
       </div>
 
       <div className="sticky bottom-0 -mx-5 -mb-4 mt-6 border-t border-slate-200 bg-white px-5 py-3">
+        {sodConflict && (
+          <p className="mb-2 text-xs text-amber-800">
+            {sodConflict[0]} and {sodConflict[1]} can&apos;t be on the same role (separation of duties). Untick one.
+          </p>
+        )}
+        {ungrantable.length > 0 && (
+          <p className="mb-2 text-xs text-amber-800">
+            Wider than you can grant: {ungrantable.map(([k]) => k).join(', ')}. Narrow or remove before saving.
+          </p>
+        )}
         {serverError && <p className="mb-2 text-sm text-red-600">{serverError}</p>}
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-slate-500">
@@ -465,8 +517,7 @@ function RoleDetail({
       await apiClient.delete(`/v1/roles/${role.id}`);
       onDeleted();
     } catch (err) {
-      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined;
-      setDeleteError(message ?? 'Could not delete the role.');
+      setDeleteError(errorMessage(err, 'Could not delete the role.'));
       setDeleting(false);
     }
   };
@@ -677,9 +728,11 @@ export default function RolesPage() {
     queryFn: async () => (await apiClient.get('/v1/roles')).data,
   });
 
+  // The roles-side copy of the catalog, gated by roles.manage alone (the
+  // /v1/permissions list also needs permissions.manage).
   const permissionsQuery = useQuery<Permission[]>({
-    queryKey: ['permissions'],
-    queryFn: async () => (await apiClient.get('/v1/permissions')).data,
+    queryKey: ['roles', 'permission-catalog'],
+    queryFn: async () => (await apiClient.get('/v1/roles/permission-catalog')).data,
     enabled: showForm || editingRoleId !== null,
   });
 
@@ -739,7 +792,7 @@ export default function RolesPage() {
           </div>
         )}
         {permissionsQuery.isError && (
-          <ErrorState message="Couldn't load the permission list. Creating roles also needs the permissions.manage permission." />
+          <ErrorState message="Couldn't load the permission list. Close this panel and try again." />
         )}
         {!permissionsQuery.isLoading && !permissionsQuery.isError && (
           <RoleForm
@@ -779,7 +832,7 @@ export default function RolesPage() {
           </div>
         )}
         {editingRole && permissionsQuery.isError && (
-          <ErrorState message="Couldn't load the permission list. Editing roles also needs the permissions.manage permission." />
+          <ErrorState message="Couldn't load the permission list. Close this panel and try again." />
         )}
         {editingRole && permissionsQuery.data && (
           <RoleForm

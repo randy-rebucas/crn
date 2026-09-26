@@ -25,6 +25,17 @@ interface Values {
   method: (typeof PAYMENT_METHODS)[number];
 }
 
+// Payments already recorded but not yet verified. They don't count toward
+// the invoice's paid amount, but they will once verified, so a new payment
+// can only cover what's left after them (the API enforces the same rule).
+function pendingOf(inv: Invoice) {
+  return inv.payments.filter((p) => p.status === 'PENDING').reduce((sum, p) => sum + p.amount, 0);
+}
+
+function payableOf(inv: Invoice) {
+  return Math.max(outstandingOf(inv) - pendingOf(inv), 0);
+}
+
 // Records a PENDING payment; a cashier with payments.verify confirms it
 // afterwards, which is what issues the receipt and moves the invoice status.
 export function RecordPaymentForm({
@@ -38,7 +49,8 @@ export function RecordPaymentForm({
 }) {
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
-  const payable = invoices.filter((inv) => outstandingOf(inv) > 0);
+  const payable = invoices.filter((inv) => payableOf(inv) > 0);
+  const coveredByPending = invoices.some((inv) => outstandingOf(inv) > 0 && payableOf(inv) === 0);
   const initial = invoices.find((inv) => inv.id === initialInvoiceId);
 
   const {
@@ -50,14 +62,16 @@ export function RecordPaymentForm({
   } = useForm<Values>({
     defaultValues: {
       invoiceId: initialInvoiceId ?? '',
-      amount: initial ? centsToInput(outstandingOf(initial)) : '',
+      amount: initial && payableOf(initial) > 0 ? centsToInput(payableOf(initial)) : '',
       method: 'CASH',
     },
   });
 
   const invoiceId = useWatch({ control, name: 'invoiceId' });
   const selected = invoices.find((inv) => inv.id === invoiceId);
-  const balance = selected ? outstandingOf(selected) : 0;
+  const outstanding = selected ? outstandingOf(selected) : 0;
+  const pendingAmount = selected ? pendingOf(selected) : 0;
+  const balance = selected ? payableOf(selected) : 0;
 
   const onSubmit = async (values: Values) => {
     setServerError(null);
@@ -83,19 +97,30 @@ export function RecordPaymentForm({
             required: 'Choose the invoice being paid',
             onChange: (e) => {
               const inv = invoices.find((i) => i.id === e.target.value);
-              if (inv) setValue('amount', centsToInput(outstandingOf(inv)));
+              if (inv) setValue('amount', centsToInput(payableOf(inv)));
             },
           })}
         >
           <option value="">Select an invoice…</option>
           {payable.map((inv) => (
             <option key={inv.id} value={inv.id}>
-              {personName(inv.enrollment?.student.user)} · {inv.enrollment?.program?.name ?? 'Program'} · {money(outstandingOf(inv))} due
+              {personName(inv.enrollment?.student.user)} · {inv.enrollment?.program?.name ?? 'Program'} · {money(payableOf(inv))} due
             </option>
           ))}
         </Select>
       </Field>
-      {payable.length === 0 && <p className="-mt-3 text-xs text-slate-500">Every invoice is fully paid.</p>}
+      {payable.length === 0 && (
+        <p className="-mt-3 text-xs text-slate-500">
+          {coveredByPending
+            ? 'Every open balance is already covered by payments waiting for verification.'
+            : 'Every invoice is fully paid.'}
+        </p>
+      )}
+      {selected && payableOf(selected) === 0 && outstanding > 0 && (
+        <p className="-mt-3 text-xs text-amber-800">
+          Payments waiting for verification already cover this balance. Verify or reject them first.
+        </p>
+      )}
 
       {selected && (
         <dl className="grid grid-cols-3 divide-x divide-slate-200 rounded-lg bg-slate-50 py-3 text-center text-xs">
@@ -105,11 +130,12 @@ export function RecordPaymentForm({
           </div>
           <div>
             <dt className="text-slate-500">Paid</dt>
-            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-emerald-700">{money(selected.totalAmount - balance)}</dd>
+            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-emerald-700">{money(selected.totalAmount - outstanding)}</dd>
           </div>
           <div>
             <dt className="text-slate-500">Balance</dt>
-            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-red-700">{money(balance)}</dd>
+            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-red-700">{money(outstanding)}</dd>
+            {pendingAmount > 0 && <dd className="text-[11px] text-amber-700">{money(pendingAmount)} pending</dd>}
           </div>
         </dl>
       )}
@@ -122,7 +148,11 @@ export function RecordPaymentForm({
               validate: (v) => {
                 const cents = toCents(v);
                 if (Number.isNaN(cents) || cents <= 0) return 'Enter an amount like 5000 or 5,000.50';
-                if (selected && cents > balance) return `That's more than the ${money(balance)} balance`;
+                if (selected && cents > balance) {
+                  return pendingAmount > 0
+                    ? `Only ${money(balance)} is left once the ${money(pendingAmount)} already pending is verified`
+                    : `That's more than the ${money(balance)} balance`;
+                }
                 return true;
               },
             })}

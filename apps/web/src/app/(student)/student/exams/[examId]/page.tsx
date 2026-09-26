@@ -196,6 +196,8 @@ export default function ExamDetailPage() {
             starting={startAttempt.isPending}
             startError={startAttempt.isError}
             onStart={() => startAttempt.mutate()}
+            history={myAttempts.isSuccess ? 'ready' : myAttempts.isError ? 'error' : 'loading'}
+            onRetryHistory={() => myAttempts.refetch()}
           />
         </aside>
 
@@ -230,6 +232,8 @@ function ActionPanel({
   starting,
   startError,
   onStart,
+  history,
+  onRetryHistory,
 }: {
   examId: string;
   standing: Standing;
@@ -242,6 +246,8 @@ function ActionPanel({
   starting: boolean;
   startError: boolean;
   onStart: () => void;
+  history: 'loading' | 'error' | 'ready';
+  onRetryHistory: () => void;
 }) {
   const heading =
     standing === 'in-progress'
@@ -302,7 +308,21 @@ function ActionPanel({
       </ul>
 
       <div className="mt-5 border-t border-slate-100 pt-5">
-        {inProgressId ? (
+        {/* Until the attempt history loads, "no attempt in progress" and
+            "attempts left" are unknown — starting now could open a second
+            attempt next to one already running and use up another try. */}
+        {history === 'loading' ? (
+          <button type="button" disabled className={`${buttonBase} bg-red-700 text-white disabled:cursor-wait disabled:opacity-70`}>
+            Checking your attempts…
+          </button>
+        ) : history === 'error' ? (
+          <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            Couldn&apos;t load your attempts on this exam, so starting is paused.{' '}
+            <button type="button" onClick={onRetryHistory} className="font-semibold underline underline-offset-2">
+              Try again
+            </button>
+          </div>
+        ) : inProgressId ? (
           <Link href={`/student/exams/${examId}/attempt/${inProgressId}`} className={`${buttonBase} bg-red-700 text-white hover:bg-red-800`}>
             Resume attempt
             {icons.arrowRight}

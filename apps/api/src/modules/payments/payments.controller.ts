@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { PaymentStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { PermissionsGuard } from '../../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator.js';
@@ -14,8 +15,15 @@ export class PaymentsController {
 
   @Get()
   @RequirePermissions('payments.view')
-  findAll(@CurrentUser() user: AuthenticatedUser, @Query('invoiceId') invoiceId?: string) {
-    return this.payments.findAllForInvoice(user, invoiceId);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('invoiceId') invoiceId?: string,
+    @Query('status') status?: string,
+  ) {
+    if (status !== undefined && !Object.values(PaymentStatus).includes(status as PaymentStatus)) {
+      throw new BadRequestException(`Unknown payment status "${status}"`);
+    }
+    return this.payments.findAllForInvoice(user, invoiceId, status as PaymentStatus | undefined);
   }
 
   @Post()

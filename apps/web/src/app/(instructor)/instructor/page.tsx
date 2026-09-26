@@ -11,18 +11,21 @@ import {
   buildAgenda,
   dayKey,
   formatTime,
+  recordDayKey,
   relativeDay,
   timeAgo,
 } from '@/lib/instructor-schedule';
 import {
   type AttendanceRecord,
   type InstructorClass,
+  useCanTakeAttendance,
   useGradingQueue,
   useInstructorName,
   useMyAttendance,
   useMyClasses,
   useMyRosters,
   useMySchedules,
+  useNow,
 } from '@/lib/instructor-hooks';
 import { useMyNotifications } from '@/lib/student-hooks';
 import { instructorIcons as icons } from '@/components/instructor-ui';
@@ -386,7 +389,7 @@ function PerformancePanel({
     return classes
       .map((cls) => {
         const rows = inRange.filter((r) => r.classId === cls.id);
-        return { name: cls.name, rate: attendanceRate(rows), sessions: new Set(rows.map((r) => dayKey(new Date(r.date)))).size };
+        return { name: cls.name, rate: attendanceRate(rows), sessions: new Set(rows.map(recordDayKey)).size };
       })
       .filter((row): row is typeof row & { rate: number } => row.rate !== null)
       .map((row, i) => ({ ...row, color: SERIES[i % SERIES.length] }));
@@ -514,9 +517,9 @@ function ActivityPanel({ items, loading, className }: { items: ActivityItem[]; l
 export default function InstructorHomePage() {
   const { hasPermission } = useAuth();
   const canClasses = hasPermission('classes.view');
-  const canAttendance = hasPermission('attendance.view');
+  const canAttendance = useCanTakeAttendance();
 
-  const [now] = useState(() => new Date());
+  const now = useNow();
   const name = useInstructorName();
   const myClasses = useMyClasses();
   const classIds = useMemo(() => myClasses.classes.map((c) => c.id), [myClasses.classes]);
@@ -539,7 +542,7 @@ export default function InstructorHomePage() {
     const items: ActivityItem[] = [];
     for (const a of grading.attempts) {
       const who = `${a.student.user.firstName} ${a.student.user.lastName}`;
-      const exam = grading.examTitle.get(a.examId) ?? 'Exam';
+      const exam = a.exam.title;
       if (a.status === 'SUBMITTED' && a.submittedAt) {
         items.push({ id: `sub-${a.id}`, at: a.submittedAt, title: 'Exam attempt submitted', detail: `${who} · ${exam}`, icon: icons.fileText, tone: 'bg-red-50 text-red-600' });
       }
@@ -550,7 +553,7 @@ export default function InstructorHomePage() {
     // One entry per class session marked, not per student row.
     const sessions = new Map<string, { at: string; classId: string; date: string; count: number }>();
     for (const r of attendance.records) {
-      const key = `${r.classId}-${r.date.slice(0, 10)}`;
+      const key = `${r.classId}-${recordDayKey(r)}`;
       const existing = sessions.get(key);
       const at = r.updatedAt ?? r.createdAt;
       if (!existing) sessions.set(key, { at, classId: r.classId, date: r.date, count: 1 });
@@ -574,7 +577,7 @@ export default function InstructorHomePage() {
       items.push({ id: `ntf-${n.id}`, at: n.createdAt, title: n.title, detail: n.body ?? 'Notification', icon: icons.bell, tone: 'bg-emerald-50 text-emerald-600' });
     }
     return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5);
-  }, [grading.attempts, grading.examTitle, attendance.records, classById, notifications.data]);
+  }, [grading.attempts, attendance.records, classById, notifications.data]);
 
   const summaryParts: string[] = [];
   if (canClasses && !schedules.isLoading && !myClasses.isLoading) {

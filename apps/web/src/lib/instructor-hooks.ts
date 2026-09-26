@@ -1,13 +1,13 @@
 'use client';
 
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from './api-client';
 import { useAuth } from './auth-context';
 
 // Data layer for the instructor portal's "Today" view. Everything is
 // derived from endpoints an instructor already holds permission for —
-// query keys match the ones attendance-view.tsx / grading-view.tsx use, so
+// class/attendance query keys match the ones attendance-view.tsx uses, so
 // the Today view and the drill-in pages share one cache instead of
 // fetching the same rows twice.
 
@@ -43,12 +43,6 @@ export interface AttendanceRecord {
   updatedAt: string;
 }
 
-export interface Exam {
-  id: string;
-  title: string;
-  status: string;
-}
-
 export interface Attempt {
   id: string;
   examId: string;
@@ -56,6 +50,33 @@ export interface Attempt {
   submittedAt: string | null;
   gradedAt: string | null;
   student: { id: string; user: { firstName: string; lastName: string } };
+  exam: { id: string; title: string };
+}
+
+// The portal is meant to sit open on a desk between classes, so "in
+// session" / "next" / "today" must follow the wall clock rather than the
+// moment the page mounted. Ticks on each minute boundary.
+export function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const timeout = setTimeout(() => {
+      setNow(new Date());
+      interval = setInterval(() => setNow(new Date()), 60_000);
+    }, 60_000 - (Date.now() % 60_000));
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, []);
+  return now;
+}
+
+// Grading needs both keys: the queue lists attempts (exams.grade) but the
+// grading screen also reads the exams themselves (exams.view).
+export function useCanGrade() {
+  const { hasPermission } = useAuth();
+  return hasPermission('exams.grade') && hasPermission('exams.view');
 }
 
 export function useMyClasses() {
@@ -72,17 +93,10 @@ export function useMyClasses() {
   return { ...query, classes };
 }
 
-// The class list payload doesn't carry the instructor's display name
-// separately; their own assigned classes do, so reuse that instead of
-// falling back to a raw email address.
 export function useInstructorName() {
   const { user } = useAuth();
-  const { classes } = useMyClasses();
-  const owner = classes[0]?.instructor?.user;
-  if (owner) return { full: `${owner.firstName} ${owner.lastName}` };
-  const local = user?.email.split('@')[0] ?? '';
-  const pretty = local.charAt(0).toUpperCase() + local.slice(1);
-  return { full: pretty };
+  const full = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+  return { full: full || user?.email || '' };
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -99,6 +113,14 @@ export function useRoleLabel() {
 
 // Instructors don't hold `schedules.view`, but GET /v1/classes/:id (gated
 // on classes.view) includes each class's weekly schedules.
+// Classes are the root of every other instructor query (schedules, rosters,
+// attendance are all fetched per class), so a module that needs them is
+// usable only with classes.view — otherwise it would render confident zeros.
+export function useCanTakeAttendance() {
+  const { hasPermission } = useAuth();
+  return hasPermission('attendance.view') && hasPermission('classes.view');
+}
+
 export function useMySchedules(classIds: string[]) {
   return useQueries({
     queries: classIds.map((id) => ({
@@ -157,41 +179,25 @@ export function useMyAttendance(classIds: string[]) {
   });
 }
 
-// Attempts are listed per exam only (GET /v1/attempts?examId=), and the
-// API already scopes them to the caller's classes for ASSIGNED graders.
+// GET /v1/attempts without an examId returns every attempt the caller may
+// grade, already scoped to their classes for ASSIGNED graders — one request
+// rather than one per exam.
 export function useGradingQueue() {
-  const { hasPermission } = useAuth();
-  const canGrade = hasPermission('exams.grade');
-  const exams = useQuery<Exam[]>({
-    queryKey: ['exams'],
-    enabled: canGrade && hasPermission('exams.view'),
-    queryFn: async () => (await apiClient.get('/v1/exams')).data,
+  const canGrade = useCanGrade();
+  const query = useQuery<Attempt[]>({
+    queryKey: ['attempts', 'queue'],
+    enabled: canGrade,
+    queryFn: async () => (await apiClient.get('/v1/attempts')).data,
   });
-  const gradable = (exams.data ?? []).filter((e) => e.status !== 'DRAFT');
-
-  const attempts = useQueries({
-    queries: gradable.map((exam) => ({
-      queryKey: ['attempts', exam.id],
-      queryFn: async () =>
-        (await apiClient.get<Attempt[]>('/v1/attempts', { params: { examId: exam.id } })).data,
-    })),
-    combine: (results) => ({
-      attempts: results.flatMap((r) => r.data ?? []),
-      isLoading: results.some((r) => r.isLoading),
-      isError: results.some((r) => r.isError),
-    }),
-  });
-
-  const examTitle = new Map(gradable.map((e) => [e.id, e.title]));
-  const pending = attempts.attempts.filter((a) => a.status === 'SUBMITTED');
+  const attempts = useMemo(() => query.data ?? [], [query.data]);
+  const pending = attempts.filter((a) => a.status === 'SUBMITTED');
 
   return {
     enabled: canGrade,
-    attempts: attempts.attempts,
+    attempts,
     pendingCount: pending.length,
     examsWithPending: new Set(pending.map((a) => a.examId)).size,
-    examTitle,
-    isLoading: exams.isLoading || attempts.isLoading,
-    isError: exams.isError || attempts.isError,
+    isLoading: query.isLoading,
+    isError: query.isError,
   };
 }

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { apiClient } from '@/lib/api-client';
+import { humanize } from '@/lib/format';
 import { Button, Card, ErrorState, PageHeader } from '@/components/ui';
 import { icons as baseIcons } from '@/components/student-ui';
 import { adminIcons } from '@/components/admin-shell';
@@ -85,11 +86,6 @@ const DOMAIN_ICONS: Record<string, React.ReactNode> = {
   material: adminIcons.fileText,
   announcement: adminIcons.bell,
 };
-
-function humanize(value: string) {
-  const text = value.replace(/[_.]+/g, ' ').toLowerCase().trim();
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 function actorName(log: AuditLog) {
   if (log.actor) return `${log.actor.firstName} ${log.actor.lastName}`.trim() || log.actor.email;

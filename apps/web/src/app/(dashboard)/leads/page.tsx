@@ -2,13 +2,13 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -82,10 +82,6 @@ const LEAD_SOURCES = ['Walk-in', 'Phone inquiry', 'Website', 'Facebook', 'Referr
 
 // Loose but useful: accepts common PH formats like 09171234567 or +63 917 123 4567.
 const PHONE_REGEX = /^[+]?[\d\s().-]{7,20}$/;
-
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
-}
 
 function daysSince(iso: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
@@ -233,9 +229,11 @@ type CreateLeadValues = z.infer<typeof createLeadSchema>;
 function CreateLeadForm({ onCreated }: { onCreated: () => void }) {
   const { user, hasPermission } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
+  // Only feeds the suggestions list, so it's skipped without programs.view.
   const { data: programs } = useQuery<Program[]>({
     queryKey: ['programs'],
     queryFn: async () => (await apiClient.get('/v1/programs')).data,
+    enabled: hasPermission('programs.view'),
   });
   const { data: staff } = useQuery<StaffOption[]>({
     queryKey: ['staff'],

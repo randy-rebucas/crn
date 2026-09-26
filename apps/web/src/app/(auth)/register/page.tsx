@@ -1,7 +1,6 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { isAxiosError } from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -9,6 +8,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { landingRouteForUser, useAuth } from '@/lib/auth-context';
+import { errorMessage } from '@/lib/errors';
 
 const schema = z.object({
   firstName: z.string().min(1, 'Required'),
@@ -34,15 +34,19 @@ export default function RegisterPage() {
     setServerError(null);
     try {
       await apiClient.post('/v1/public/register', values);
-      // Registration doesn't return a session — sign the new account in
-      // immediately so it isn't a dead end.
+    } catch (err) {
+      setServerError(errorMessage(err, 'Could not create your account.'));
+      return;
+    }
+    // Registration doesn't return a session — sign the new account in
+    // immediately so it isn't a dead end. The account exists by now, so a
+    // failure here must not read as "couldn't create it": a retry would only
+    // hit "email already registered".
+    try {
       const user = await login(values.email, values.password);
       router.replace(landingRouteForUser(user));
-    } catch (err) {
-      setServerError(
-        (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ??
-          'Could not create your account.',
-      );
+    } catch {
+      router.replace('/login?registered=1');
     }
   };
 
@@ -66,16 +70,24 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">First name</label>
+            <label htmlFor="register-first-name" className="mb-1 block text-sm font-medium text-slate-700">
+              First name
+            </label>
             <input
+              id="register-first-name"
+              autoComplete="given-name"
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
               {...register('firstName')}
             />
             {errors.firstName && <p className="mt-1 text-xs text-red-600">{errors.firstName.message}</p>}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Last name</label>
+            <label htmlFor="register-last-name" className="mb-1 block text-sm font-medium text-slate-700">
+              Last name
+            </label>
             <input
+              id="register-last-name"
+              autoComplete="family-name"
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
               {...register('lastName')}
             />
@@ -84,9 +96,13 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Email Address</label>
+          <label htmlFor="register-email" className="mb-1 block text-sm font-medium text-slate-700">
+            Email Address
+          </label>
           <input
+            id="register-email"
             type="email"
+            autoComplete="email"
             placeholder="you@example.com"
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
             {...register('email')}
@@ -95,18 +111,26 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Phone (optional)</label>
+          <label htmlFor="register-phone" className="mb-1 block text-sm font-medium text-slate-700">
+            Phone (optional)
+          </label>
           <input
+            id="register-phone"
             type="tel"
+            autoComplete="tel"
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
             {...register('phone')}
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+          <label htmlFor="register-password" className="mb-1 block text-sm font-medium text-slate-700">
+            Password
+          </label>
           <input
+            id="register-password"
             type="password"
+            autoComplete="new-password"
             placeholder="Enter your password"
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
             {...register('password')}

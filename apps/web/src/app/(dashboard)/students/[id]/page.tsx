@@ -292,14 +292,16 @@ export default function StudentDetailPage() {
     queryFn: async () => (await apiClient.get('/v1/attendance', { params: { studentId: params.id } })).data,
     enabled: canAttendance,
   });
+  // Filtered server-side to this student rather than downloading the whole
+  // organization's invoices and certificates and filtering here.
   const invoicesQuery = useQuery<Invoice[]>({
-    queryKey: ['invoices'],
-    queryFn: async () => (await apiClient.get('/v1/invoices')).data,
+    queryKey: ['invoices', 'student', params.id],
+    queryFn: async () => (await apiClient.get('/v1/invoices', { params: { studentId: params.id } })).data,
     enabled: canInvoices,
   });
   const certificatesQuery = useQuery<Certificate[]>({
-    queryKey: ['certificates'],
-    queryFn: async () => (await apiClient.get('/v1/certificates')).data,
+    queryKey: ['certificates', 'student', params.id],
+    queryFn: async () => (await apiClient.get('/v1/certificates', { params: { studentId: params.id } })).data,
     enabled: canCertificates,
   });
 
@@ -308,7 +310,6 @@ export default function StudentDetailPage() {
   const branchName = new Map((branchesQuery.data ?? []).map((b) => [b.id, b.name]));
 
   const enrollments = [...(data?.enrollments ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const enrollmentIds = new Set(enrollments.map((e) => e.id));
   const current = enrollments.find((e) => e.status === 'ENROLLED') ?? enrollments[0];
 
   const attendance = [...(attendanceQuery.data ?? [])].sort((a, b) => b.date.localeCompare(a.date));
@@ -329,13 +330,13 @@ export default function StudentDetailPage() {
     byClass.set(r.class.id, row);
   }
 
-  const invoices = (invoicesQuery.data ?? []).filter((inv) => enrollmentIds.has(inv.enrollmentId));
+  const invoices = invoicesQuery.data ?? [];
   const openInvoices = invoices.filter((inv) => inv.status !== 'CANCELLED');
   const billed = openInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
   const paid = openInvoices.reduce((sum, inv) => sum + netPaid(inv), 0);
   const balance = Math.max(0, billed - paid);
 
-  const certificates = (certificatesQuery.data ?? []).filter((c) => c.studentId === params.id);
+  const certificates = certificatesQuery.data ?? [];
 
   const fullName = data ? `${data.user.firstName} ${data.user.lastName}` : 'Student';
 

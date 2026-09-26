@@ -91,9 +91,11 @@ npm run db:down
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Signing secrets for access/refresh tokens |
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | Token lifetimes (`15m` / `7d` by default) |
 | `PORT` | API port (`3001`) |
+| `TRUST_PROXY` | Set when the API runs behind a reverse proxy, so rate limits see real client IPs: a hop count (`1`), `true`, or proxy addresses/subnets. Leave unset when clients reach the API directly |
 
 `apps/web` reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:3001`) — see
-[Demo login](#demo-login) below.
+[Demo login](#demo-login) below — and `NEXT_PUBLIC_SITE_URL`, the public site's origin used for
+canonical/Open Graph URLs, `sitemap.xml`, and `robots.txt` (defaults to `http://localhost:3000`).
 
 ## Demo login
 

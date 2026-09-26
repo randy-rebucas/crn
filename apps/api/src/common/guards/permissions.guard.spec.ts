@@ -24,6 +24,8 @@ function makeUser(permissions: AuthenticatedUser['permissions']): AuthenticatedU
     id: 'user-1',
     organizationId: 'org-1',
     email: 'user@example.com',
+    firstName: 'Test',
+    lastName: 'User',
     branchIds: [],
     roles: [],
     permissions,

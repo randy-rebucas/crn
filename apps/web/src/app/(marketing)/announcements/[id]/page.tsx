@@ -2,30 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
-import { API_BASE_URL } from '@/lib/api-client';
-
-interface PublicAnnouncement {
-  id: string;
-  title: string;
-  body: string;
-  publishedAt: string | null;
-  createdAt: string;
-}
-
-async function getAnnouncement(id: string): Promise<PublicAnnouncement | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/announcements/${id}`, { next: { revalidate: 60 } });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+import { formatDate } from '@/lib/format';
+import { excerpt, getAnnouncement } from '@/lib/public-api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const announcement = await getAnnouncement(id);
-  return { title: announcement?.title ?? 'Announcement' };
+  if (!announcement) return { title: 'Announcement' };
+  return { title: announcement.title, description: excerpt(announcement.body) };
 }
 
 export default async function AnnouncementDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -38,9 +22,7 @@ export default async function AnnouncementDetailsPage({ params }: { params: Prom
       <Link href="/announcements" className="text-sm text-brand-maroon hover:underline">
         ← Back to announcements
       </Link>
-      <p className="mt-4 text-xs text-slate-500">
-        {new Date(announcement.publishedAt ?? announcement.createdAt).toLocaleDateString()}
-      </p>
+      <p className="mt-4 text-xs text-slate-500">{formatDate(announcement.publishedAt ?? announcement.createdAt)}</p>
       <h1 className="mt-1 font-heading text-3xl font-bold text-slate-900">{announcement.title}</h1>
       <div className="mt-4 space-y-3 text-slate-600 [&_a]:text-brand-maroon [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
         <ReactMarkdown>{announcement.body}</ReactMarkdown>

@@ -1,115 +1,19 @@
-'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { API_BASE_URL } from '@/lib/api-client';
-import { PUBLIC_SETTINGS_FALLBACK, phonesOf, withFallbacks, type PublicSettings } from '@/lib/public-settings';
+import { fetchPublicSettings, phonesOf } from '@/lib/public-settings';
+import { SITE_NAV } from './nav-items';
+import { SiteHeader } from './site-header';
 
-const NAV_ITEMS = [
-  { label: 'About', href: '/about' },
-  { label: 'Programs', href: '/programs' },
-  { label: 'Reviews', href: '/success-stories' },
-  { label: 'Gallery', href: '/gallery' },
-  { label: 'Blog', href: '/blog' },
-  { label: 'Contact', href: '/contact' },
-];
-
-function Logo() {
-  return (
-    <Link href="/" className="flex items-center gap-3">
-      <Image
-        src="/obias_crn_logo_transparent.png"
-        alt="OBIAS Nursing &amp; Allied Courses Review Center"
-        width={44}
-        height={36}
-        className="h-9 w-auto"
-        priority
-      />
-      <span className="flex flex-col leading-none">
-        <span className="font-heading text-lg font-bold tracking-wide text-brand-maroon">OBIAS</span>
-        <span className="mt-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-brand-navy">
-          Nursing &amp; Allied Courses Review Center
-        </span>
-      </span>
-    </Link>
-  );
-}
-
-export default function MarketingLayout({ children }: { children: React.ReactNode }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  // Contact block comes from Settings; the fallback keeps it filled while
-  // loading or if the API is down.
-  const { data: contact = PUBLIC_SETTINGS_FALLBACK } = useQuery<PublicSettings>({
-    queryKey: ['public', 'settings'],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE_URL}/v1/public/settings`);
-      if (!res.ok) throw new Error('settings unavailable');
-      return withFallbacks(await res.json());
-    },
-    staleTime: 5 * 60_000,
-  });
+export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
+  // Contact block comes from Settings; fetchPublicSettings falls back to the
+  // center's real details if the API is down, so this never renders empty.
+  const contact = await fetchPublicSettings();
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <Logo />
-          <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 lg:flex">
-            {NAV_ITEMS.map((item) => (
-              <Link key={item.href} href={item.href} className="transition-colors hover:text-brand-maroon">
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/contact"
-              className="inline-flex rounded-md bg-brand-maroon px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-maroon-dark sm:px-4 sm:text-sm"
-            >
-              Enroll Now
-            </Link>
-            <button
-              type="button"
-              aria-expanded={menuOpen}
-              aria-controls="marketing-mobile-nav"
-              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-              onClick={() => setMenuOpen((open) => !open)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-brand-maroon lg:hidden"
-            >
-              <span className="sr-only">{menuOpen ? 'Close menu' : 'Open menu'}</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-5 w-5">
-                {menuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
-              </svg>
-            </button>
-          </div>
-        </div>
-        {menuOpen ? (
-          <nav id="marketing-mobile-nav" className="border-t border-slate-200 bg-white px-6 py-4 lg:hidden">
-            <ul className="flex flex-col gap-1">
-              {NAV_ITEMS.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className="block rounded-md px-2 py-2.5 text-sm font-medium text-slate-700 hover:bg-brand-cream hover:text-brand-maroon"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/contact"
-              onClick={() => setMenuOpen(false)}
-              className="mt-3 block rounded-md bg-brand-maroon px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-maroon-dark"
-            >
-              Enroll Now
-            </Link>
-          </nav>
-        ) : null}
-      </header>
+    // Explicit light surface: the root stylesheet switches the body to a dark
+    // background under prefers-color-scheme, which this site doesn't support.
+    <div className="flex flex-1 flex-col bg-white text-slate-900">
+      <SiteHeader />
 
       <main className="flex-1">{children}</main>
 
@@ -134,7 +38,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <div>
             <h2 className="font-heading text-sm font-bold uppercase tracking-[0.14em] text-white">Explore</h2>
             <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-sm text-slate-300">
-              {NAV_ITEMS.map((item) => (
+              {SITE_NAV.map((item) => (
                 <li key={item.href}>
                   <Link href={item.href} className="transition-colors hover:text-brand-gold">
                     {item.label}

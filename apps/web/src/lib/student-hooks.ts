@@ -2,16 +2,10 @@
 
 // Shared react-query hooks for the student-facing (student) route group.
 //
-// IMPORTANT scoping note (see report to caller for full detail): most API
-// list endpoints (`classes`, `schedules`, `courses`, `subjects`, `modules`,
-// `lessons`, `materials`, `exams`, `certificates`) are organization-wide and
-// are NOT narrowed to "my data" server-side. `students.view` and the
-// attempts endpoints (`start`/`submit`/`findResultForStudent`) ARE
-// self-scoped server-side. Everywhere else, this file fetches the
-// broadest available list and filters client-side by the caller's own
-// studentProfile id / active enrollment's programId / batchId. This is a
-// stopgap, not a substitute for real server-side scoping — flagged in the
-// build report.
+// Scoping: most hooks here call self-scoped endpoints (`/me`, `/mine`,
+// notifications) and need no client-side narrowing. The exceptions are the
+// profile and enrollment lookups, which go through the general list
+// endpoints and so match on the caller's own ids below; each says why.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './api-client';
@@ -59,10 +53,13 @@ export function useMyStudentProfile() {
   const { user } = useAuth();
   return useQuery<StudentProfile | null>({
     queryKey: ['my-student-profile'],
-    enabled: Boolean(user),
+    // Staff with org-wide students.view would get every profile back, so the
+    // lookup only runs for student accounts and only ever matches by userId —
+    // never "the first one", which for staff is some other student.
+    enabled: Boolean(user?.roles.includes('student')),
     queryFn: async () => {
       const { data } = await apiClient.get<StudentProfile[]>('/v1/students');
-      return data.find((s) => s.user.id === user?.id) ?? data[0] ?? null;
+      return data.find((s) => s.user.id === user?.id) ?? null;
     },
   });
 }

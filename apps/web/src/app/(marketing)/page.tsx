@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { listPrograms } from '@/lib/public-api';
 import { fetchPublicSettings } from '@/lib/public-settings';
 
 export const metadata: Metadata = {
@@ -15,11 +16,14 @@ const HERO_HIGHLIGHTS = [
   { label: 'Experienced Review Instructors' },
 ];
 
+// Curated copy and icons per board program. `match` finds the published
+// program (by name) whose page the card links to; without one it falls back
+// to the full list.
 const PROGRAMS = [
-  { name: 'Nursing (NLE)', blurb: 'Comprehensive review for future RNs.', icon: 'stethoscope' as const },
-  { name: 'Midwifery', blurb: 'Build a brighter future in midwifery.', icon: 'caregiving' as const },
-  { name: 'Medical Technology', blurb: 'Pass with confidence.', icon: 'microscope' as const },
-  { name: 'Physical Therapy', blurb: 'Achieve your goals in allied health.', icon: 'therapy' as const },
+  { name: 'Nursing (NLE)', match: 'nursing', blurb: 'Comprehensive review for future RNs.', icon: 'stethoscope' as const },
+  { name: 'Midwifery', match: 'midwifery', blurb: 'Build a brighter future in midwifery.', icon: 'caregiving' as const },
+  { name: 'Medical Technology', match: 'medical tech', blurb: 'Pass with confidence.', icon: 'microscope' as const },
+  { name: 'Physical Therapy', match: 'physical therapy', blurb: 'Achieve your goals in allied health.', icon: 'therapy' as const },
 ];
 
 const ALSO_OFFERING = ['Seminar & Training', 'Caregiving Course', 'Foreign Language Skills'];
@@ -127,7 +131,13 @@ function Initial({ name }: { name: string }) {
 }
 
 export default async function MarketingHomePage() {
-  const settings = await fetchPublicSettings();
+  // The home page must render even when the API is down: settings fall back
+  // to the center's real details, and program cards to the full list.
+  const [settings, published] = await Promise.all([fetchPublicSettings(), listPrograms().catch(() => [])]);
+  const programHref = (match: string) => {
+    const program = published.find((p) => p.name.toLowerCase().includes(match));
+    return program ? `/programs/${program.slug}` : '/offerings';
+  };
   // Banner text is admin-controlled (Settings > Enrollment); closing
   // enrollment swaps it for a next-intake prompt.
   const banner = settings.enrollmentOpen ? settings.enrollmentNotice : 'Enrollment closed · Inquire for the next intake';
@@ -249,7 +259,8 @@ export default async function MarketingHomePage() {
                 <h3 className="mt-4 font-heading font-semibold text-slate-900">{program.name}</h3>
                 <p className="mt-2 text-sm text-slate-600">{program.blurb}</p>
                 <Link
-                  href="/offerings"
+                  href={programHref(program.match)}
+                  aria-label={`Learn more about ${program.name}`}
                   className="mt-4 inline-block text-sm font-semibold text-brand-maroon hover:text-brand-maroon-dark"
                 >
                   Learn More &rarr;

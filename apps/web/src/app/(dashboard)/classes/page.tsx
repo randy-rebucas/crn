@@ -1,13 +1,13 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -66,10 +66,13 @@ interface ClassRecord {
   batch: { id: string; name: string };
   room: Room | null;
   instructor: { id: string; user: { firstName: string; lastName: string } } | null;
+  /** Students ENROLLED in the class's batch, counted by the API. */
+  enrolledCount?: number;
 }
 
 interface Schedule {
   id: string;
+  classId: string;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
@@ -342,8 +345,7 @@ function CreateClassForm({
       reset();
       onCreated();
     } catch (err) {
-      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined;
-      setServerError(message ?? 'Could not create the class. Check your connection and try again.');
+      setServerError(errorMessage(err, 'Could not create the class. Check your connection and try again.'));
     }
   };
 
@@ -471,8 +473,7 @@ function CreateRoomForm({ branches, onCreated }: { branches: Branch[]; onCreated
       reset();
       onCreated();
     } catch (err) {
-      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined;
-      setServerError(message ?? 'Could not create the room. Check your connection and try again.');
+      setServerError(errorMessage(err, 'Could not create the room. Check your connection and try again.'));
     }
   };
 
@@ -518,34 +519,26 @@ function useClassData() {
   });
   const classes = classesQuery.data ?? [];
 
-  // Rosters and schedules are per-class endpoints; each is fetched only when
-  // the viewer holds its permission, and the column simply hides otherwise.
-  const rosterCounts = useQueries({
-    queries: classes.map((cls) => ({
-      queryKey: ['classes', cls.id, 'roster'],
-      queryFn: async (): Promise<unknown[]> => (await apiClient.get(`/v1/classes/${cls.id}/roster`)).data,
-      enabled: canRoster,
-    })),
-  });
-  const scheduleQueries = useQueries({
-    queries: classes.map((cls) => ({
-      queryKey: ['schedules', cls.id],
-      queryFn: async (): Promise<Schedule[]> =>
-        (await apiClient.get('/v1/schedules', { params: { classId: cls.id } })).data,
-      enabled: canSchedules,
-    })),
+  // Headcounts come on the class list itself, and the whole week's meeting
+  // times in one query — this used to be two requests per class. Enrollment
+  // figures stay behind attendance.view, as the per-class rosters were.
+  const schedulesQuery = useQuery<Schedule[]>({
+    queryKey: ['schedules', 'all'],
+    queryFn: async () => (await apiClient.get('/v1/schedules')).data,
+    enabled: canSchedules,
   });
 
   const enrolled = new Map<string, number>();
+  if (canRoster) {
+    for (const cls of classes) if (cls.enrolledCount !== undefined) enrolled.set(cls.id, cls.enrolledCount);
+  }
   const schedules = new Map<string, Schedule[]>();
-  classes.forEach((cls, i) => {
-    const roster = rosterCounts[i]?.data;
-    if (roster) enrolled.set(cls.id, roster.length);
-    const sched = scheduleQueries[i]?.data;
-    if (sched) schedules.set(cls.id, sched);
-  });
+  if (schedulesQuery.data) {
+    for (const cls of classes) schedules.set(cls.id, []);
+    for (const s of schedulesQuery.data) schedules.get(s.classId)?.push(s);
+  }
 
-  const rostersLoading = rosterCounts.some((q) => q.isLoading);
+  const rostersLoading = classesQuery.isLoading;
 
   return { classesQuery, classes, enrolled, schedules, canRoster, canSchedules, rostersLoading };
 }
@@ -571,21 +564,27 @@ function ClassesTab() {
   const { classesQuery, classes, enrolled, schedules, canRoster, canSchedules, rostersLoading } = useClassData();
   const { isLoading, isError } = classesQuery;
 
+  // Lookups for the create form only: fetched once the drawer opens, and only
+  // those the viewer may read (anything else would just 403).
   const { data: batches } = useQuery<Batch[]>({
     queryKey: ['batches'],
     queryFn: async () => (await apiClient.get('/v1/batches')).data,
+    enabled: showForm && hasPermission('batches.view'),
   });
   const { data: branches } = useQuery<Branch[]>({
     queryKey: ['branches'],
     queryFn: async () => (await apiClient.get('/v1/branches')).data,
+    enabled: showForm && hasPermission('branches.view'),
   });
   const { data: rooms } = useQuery<Room[]>({
     queryKey: ['rooms'],
     queryFn: async () => (await apiClient.get('/v1/rooms')).data,
+    enabled: showForm && hasPermission('rooms.view'),
   });
   const { data: instructors } = useQuery<InstructorProfile[]>({
     queryKey: ['instructors'],
     queryFn: async () => (await apiClient.get('/v1/instructors')).data,
+    enabled: showForm && hasPermission('instructors.view'),
   });
 
   const statusCounts = STATUS_ORDER.map((s) => ({ status: s, count: classes.filter((c) => c.status === s).length }));
@@ -1009,9 +1008,11 @@ function RoomsTab() {
     queryKey: ['rooms'],
     queryFn: async () => (await apiClient.get('/v1/rooms')).data,
   });
+  const canBranches = hasPermission('branches.view');
   const { data: branches } = useQuery<Branch[]>({
     queryKey: ['branches'],
     queryFn: async () => (await apiClient.get('/v1/branches')).data,
+    enabled: canBranches,
   });
   const { data: classes = [] } = useQuery<ClassRecord[]>({
     queryKey: ['classes'],
@@ -1030,7 +1031,12 @@ function RoomsTab() {
   const totalSeats = rooms.reduce((sum, r) => sum + (r.capacity ?? 0), 0);
   const inUse = rooms.filter((r) => (classesByRoom.get(r.id)?.length ?? 0) > 0).length;
 
-  const byBranch = (branches ?? [])
+  // Without branches.view, group by branch id under a generic heading so the
+  // rooms still show instead of an empty list.
+  const branchList: Branch[] = canBranches
+    ? (branches ?? [])
+    : [...new Set(rooms.map((r) => r.branchId))].map((id, i) => ({ id, name: `Branch ${i + 1}` }));
+  const byBranch = branchList
     .map((b) => ({ branch: b, rooms: rooms.filter((r) => r.branchId === b.id) }))
     .filter((g) => g.rooms.length > 0);
   const maxCapacity = Math.max(1, ...rooms.map((r) => r.capacity ?? 0));

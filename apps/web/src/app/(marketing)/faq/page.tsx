@@ -1,30 +1,14 @@
 import type { Metadata } from 'next';
 import ReactMarkdown from 'react-markdown';
-import { API_BASE_URL } from '@/lib/api-client';
+import { listFaqItems } from '@/lib/public-api';
 
 export const metadata: Metadata = {
   title: 'FAQ',
   description: 'Frequently asked questions about OBIAS Nursing & Allied Courses Review Center.',
 };
 
-interface PublicFaqItem {
-  id: string;
-  question: string;
-  answer: string;
-}
-
-async function getFaqItems(): Promise<PublicFaqItem[]> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/faq`, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
-    return res.json();
-  } catch {
-    return [];
-  }
-}
-
 export default async function FaqPage() {
-  const items = await getFaqItems();
+  const items = await listFaqItems();
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
@@ -37,8 +21,14 @@ export default async function FaqPage() {
         <div className="mt-8 space-y-4">
           {items.map((item) => (
             <details key={item.id} className="group rounded-xl border border-slate-200 bg-brand-cream p-5">
-              <summary className="cursor-pointer list-none font-heading font-semibold text-slate-900">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 font-heading font-semibold text-slate-900">
                 {item.question}
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 shrink-0 text-brand-maroon transition-transform group-open:rotate-45"
+                >
+                  +
+                </span>
               </summary>
               <div className="mt-3 space-y-2 text-sm text-slate-600 [&_a]:text-brand-maroon [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold">
                 <ReactMarkdown>{item.answer}</ReactMarkdown>

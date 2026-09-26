@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { API_BASE_URL } from '@/lib/api-client';
+import { listPrograms } from '@/lib/public-api';
+import { ADDITIONAL_OFFERINGS } from './additional-offerings';
 
 export const metadata: Metadata = {
   title: 'Programs & Offerings',
@@ -8,39 +9,8 @@ export const metadata: Metadata = {
     'Review programs for Nursing, Midwifery, Medical Technology, and Physical Therapy, plus seminars, caregiving, and language courses.',
 };
 
-interface PublicCourse {
-  id: string;
-  name: string;
-  code: string;
-  description: string | null;
-}
-
-interface PublicProgram {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  courses: PublicCourse[];
-}
-
-const ADDITIONAL_OFFERINGS = [
-  { name: 'Seminar & Training', blurb: 'Short-form seminars and training sessions for healthcare professionals.' },
-  { name: 'Caregiving Course', blurb: 'Skills training for aspiring caregivers.' },
-  { name: 'Foreign Language Skills', blurb: 'Language preparation for healthcare professionals working abroad.' },
-];
-
-async function getPublishedPrograms(): Promise<PublicProgram[]> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/programs`, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
-    return res.json();
-  } catch {
-    return [];
-  }
-}
-
 export default async function OfferingsPage() {
-  const programs = await getPublishedPrograms();
+  const programs = await listPrograms();
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">

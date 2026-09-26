@@ -24,12 +24,17 @@ export class PaymentsService {
   // still narrows to one invoice's payments when provided. Scoped by
   // `payments.view` (blueprint Section 8: branch-specific financial
   // visibility) — a Finance Officer only sees their own branch's payments.
-  findAllForInvoice(user: AuthenticatedUser, invoiceId?: string) {
+  //
+  // `status` narrows to one status and lifts the 200-row cap: the
+  // verification queue (status=PENDING) must list every pending payment,
+  // not just the ones that happen to fall inside the newest 200.
+  findAllForInvoice(user: AuthenticatedUser, invoiceId?: string, status?: PaymentStatus) {
     return this.prisma.payment.findMany({
       where: {
         invoice: { organizationId: user.organizationId },
         ...paymentScopeWhere(user, 'payments.view'),
         ...(invoiceId ? { invoiceId } : {}),
+        ...(status ? { status } : {}),
       },
       include: {
         receipt: true,
@@ -43,7 +48,7 @@ export class PaymentsService {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: invoiceId ? undefined : 200,
+      take: invoiceId || status === PaymentStatus.PENDING ? undefined : 200,
     });
   }
 
@@ -55,6 +60,22 @@ export class PaymentsService {
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.CANCELLED) {
       throw new BadRequestException(`Invoice is already ${invoice.status.toLowerCase()}`);
+    }
+
+    // Same basis as the verify-time check, but counting payments still
+    // waiting for verification too: two pending payments for the full
+    // balance would otherwise both be accepted and one fail at verify.
+    const committed = await this.prisma.payment.aggregate({
+      where: { invoiceId: dto.invoiceId, status: { in: [PaymentStatus.VERIFIED, PaymentStatus.PENDING] } },
+      _sum: { amount: true },
+    });
+    const remaining = invoice.totalAmount - (committed._sum.amount ?? 0);
+    if (dto.amount > remaining) {
+      throw new BadRequestException(
+        remaining > 0
+          ? `Only ${(remaining / 100).toFixed(2)} is left to pay once pending payments are verified`
+          : 'Pending payments already cover this invoice. Verify or reject them first.',
+      );
     }
 
     const payment = await this.prisma.payment.create({

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { useAuth } from '@/lib/auth-context';
+import { landingRouteForUser, useAuth } from '@/lib/auth-context';
 import { AdminSidebar, AdminTopBar, MobileNavDrawer, adminIcons, type AdminNavGroup } from '@/components/admin-shell';
 
 interface Notification {
@@ -100,13 +100,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const requiredPermission = requiredPermissionFor(pathname);
-  const isAllowed = !requiredPermission || hasPermission(requiredPermission);
+  // Students hold SELF-scoped students/courses/exams.view, which would light
+  // up half this sidebar; their portal is /student, same as the instructor
+  // layout sends people without an instructor section home.
+  const isStudent = user ? landingRouteForUser(user) === '/student' : false;
+  const isAllowed = !isStudent && (!requiredPermission || hasPermission(requiredPermission));
 
   useEffect(() => {
     if (!isLoading && user && !isAllowed) {
-      router.replace('/dashboard');
+      router.replace(isStudent ? '/student' : '/dashboard');
     }
-  }, [isLoading, user, isAllowed, router]);
+  }, [isLoading, user, isAllowed, isStudent, router]);
 
   const notificationsQuery = useQuery<Notification[]>({
     queryKey: ['notifications'],

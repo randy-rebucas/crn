@@ -130,8 +130,8 @@ export class ExamsService {
   async addQuestion(organizationId: string, actorId: string, examId: string, dto: AddExamQuestionDto) {
     const exam = await this.prisma.exam.findFirst({ where: { id: examId, organizationId } });
     if (!exam) throw new NotFoundException('Exam not found');
-    if (exam.status === ContentStatus.PUBLISHED) {
-      throw new BadRequestException('Cannot add questions to a published exam');
+    if (exam.status === ContentStatus.PUBLISHED || exam.status === ContentStatus.ARCHIVED) {
+      throw new BadRequestException(`Cannot add questions to a ${exam.status.toLowerCase()} exam`);
     }
 
     const question = await this.prisma.question.findFirst({
@@ -149,12 +149,15 @@ export class ExamsService {
     });
     if (alreadyAdded) throw new ConflictException('That question is already on this exam');
 
+    // Append after the current last position by default — counting rows
+    // instead would collide with an existing position after a removal.
+    const last = await this.prisma.examQuestion.aggregate({ where: { examId }, _max: { position: true } });
     const examQuestion = await this.prisma.examQuestion.create({
       data: {
         examId,
         questionId: dto.questionId,
         points: dto.points ?? 1,
-        position: dto.position ?? 0,
+        position: dto.position ?? (last._max.position ?? 0) + 1,
       },
     });
 
@@ -175,8 +178,8 @@ export class ExamsService {
   async removeQuestion(organizationId: string, actorId: string, examId: string, examQuestionId: string) {
     const exam = await this.prisma.exam.findFirst({ where: { id: examId, organizationId } });
     if (!exam) throw new NotFoundException('Exam not found');
-    if (exam.status === ContentStatus.PUBLISHED) {
-      throw new BadRequestException('Cannot remove questions from a published exam');
+    if (exam.status === ContentStatus.PUBLISHED || exam.status === ContentStatus.ARCHIVED) {
+      throw new BadRequestException(`Cannot remove questions from a ${exam.status.toLowerCase()} exam`);
     }
 
     const examQuestion = await this.prisma.examQuestion.findFirst({ where: { id: examQuestionId, examId } });
@@ -198,8 +201,17 @@ export class ExamsService {
 
   async publish(organizationId: string, actorId: string, id: string) {
     const exam = await this.findOne(organizationId, id);
+    if (exam.status === ContentStatus.PUBLISHED || exam.status === ContentStatus.ARCHIVED) {
+      throw new BadRequestException(`This exam is already ${exam.status.toLowerCase()}`);
+    }
     if (exam.questions.length === 0) {
       throw new BadRequestException('Cannot publish an exam with no questions');
+    }
+    const totalPoints = exam.questions.reduce((sum, q) => sum + q.points, 0);
+    if (exam.passingScore > totalPoints) {
+      throw new BadRequestException(
+        `The pass mark (${exam.passingScore} pts) is higher than the ${totalPoints} pts the questions are worth`,
+      );
     }
 
     const updated = await this.prisma.exam.update({

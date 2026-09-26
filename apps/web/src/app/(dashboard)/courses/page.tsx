@@ -1,14 +1,14 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { errorMessage } from '@/lib/errors';
 import {
   Button,
   Card,
@@ -37,11 +37,8 @@ interface Course {
   description: string | null;
   programId: string;
   status?: string;
-}
-
-interface Subject {
-  id: string;
-  courseId: string;
+  program: { id: string; name: string };
+  _count: { subjects: number };
 }
 
 interface ClassRecord {
@@ -176,8 +173,7 @@ function CreateCourseForm({
       });
       onCreated();
     } catch (err) {
-      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined;
-      setServerError(message ?? 'Could not create the course. Check your connection and try again.');
+      setServerError(errorMessage(err, 'Could not create the course. Check your connection and try again.'));
     }
   };
 
@@ -232,32 +228,29 @@ export default function CoursesPage() {
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const canClasses = hasPermission('classes.view');
+  const canPrograms = hasPermission('programs.view');
 
+  // Every visible course in one request, each carrying its program's name and
+  // subject count — this page used to fetch per program, then per course.
+  const coursesQuery = useQuery<Course[]>({
+    queryKey: ['courses', 'all'],
+    queryFn: async () => (await apiClient.get('/v1/courses')).data,
+  });
+  const courses = coursesQuery.data ?? [];
+  const coursesLoading = coursesQuery.isLoading;
+  const coursesError = coursesQuery.isError;
+
+  // The program list (so empty programs still show) needs programs.view;
+  // without it, programs are the ones the visible courses belong to.
   const programsQuery = useQuery<Program[]>({
     queryKey: ['programs'],
     queryFn: async () => (await apiClient.get('/v1/programs')).data,
+    enabled: canPrograms,
   });
-  const programs = programsQuery.data ?? [];
+  const programs: Program[] =
+    programsQuery.data ?? [...new Map(courses.map((c) => [c.program.id, c.program])).values()];
 
-  // Courses come from /v1/courses per program (not the programs payload) so the
-  // published-only visibility rule the API applies to courses still holds.
-  const courseQueries = useQueries({
-    queries: programs.map((p) => ({
-      queryKey: ['courses', p.id],
-      queryFn: async (): Promise<Course[]> => (await apiClient.get('/v1/courses', { params: { programId: p.id } })).data,
-    })),
-  });
-  const courses = courseQueries.flatMap((q) => q.data ?? []);
-  const coursesLoading = programsQuery.isLoading || courseQueries.some((q) => q.isLoading);
-  const coursesError = programsQuery.isError || courseQueries.some((q) => q.isError);
-
-  const subjectQueries = useQueries({
-    queries: courses.map((c) => ({
-      queryKey: ['subjects', c.id],
-      queryFn: async (): Promise<Subject[]> => (await apiClient.get('/v1/subjects', { params: { courseId: c.id } })).data,
-    })),
-  });
-  const subjectCount = new Map(courses.map((c, i) => [c.id, subjectQueries[i]?.data?.length]));
+  const subjectCount = new Map(courses.map((c) => [c.id, c._count.subjects]));
 
   const classesQuery = useQuery<ClassRecord[]>({
     queryKey: ['classes'],
@@ -269,8 +262,7 @@ export default function CoursesPage() {
     classesByCourse.set(cls.course.id, [...(classesByCourse.get(cls.course.id) ?? []), cls]);
   }
 
-  const totalSubjects = [...subjectCount.values()].reduce<number>((sum, n) => sum + (n ?? 0), 0);
-  const subjectsLoading = subjectQueries.some((q) => q.isLoading);
+  const totalSubjects = [...subjectCount.values()].reduce<number>((sum, n) => sum + n, 0);
 
   const q = search.trim().toLowerCase();
   const visibleByProgram = programs
@@ -308,6 +300,7 @@ export default function CoursesPage() {
         description="Courses grouped under each program, scoped to your access."
         action={
           hasPermission('courses.create') &&
+          canPrograms &&
           programs.length > 0 && (
             <Button onClick={() => setShowForm(true)} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
               {icons.plus}
@@ -332,10 +325,10 @@ export default function CoursesPage() {
 
       {coursesLoading && <LoadingState />}
       {coursesError && <ErrorState message="Could not load courses. Refresh the page to try again." />}
-      {!programsQuery.isLoading && !programsQuery.isError && programs.length === 0 && (
+      {canPrograms && programsQuery.data && programs.length === 0 && (
         <EmptyState title="No programs yet" description="Create a program on the Programs page, then add its courses here." />
       )}
-      {!coursesLoading && programs.length > 0 && courses.length === 0 && (
+      {coursesQuery.data && courses.length === 0 && (!canPrograms || programs.length > 0) && (
         <EmptyState title="No courses yet" description="Create the first course for one of your programs." />
       )}
 
@@ -345,7 +338,7 @@ export default function CoursesPage() {
             {[
               { icon: icons.grad, label: 'Programs', value: programs.length },
               { icon: icons.book, label: 'Courses', value: courses.length },
-              { icon: icons.list, label: 'Subjects', value: subjectsLoading ? '…' : totalSubjects },
+              { icon: icons.list, label: 'Subjects', value: totalSubjects },
               ...(canClasses ? [{ icon: icons.users, label: 'Classes running them', value: classesQuery.data?.length ?? '…' }] : []),
             ].map((stat) => (
               <div key={stat.label} className="flex items-center gap-3 p-4 sm:p-5">
@@ -364,70 +357,66 @@ export default function CoursesPage() {
             meta="Courses with subjects written, by program"
             className="mb-6"
           >
-            {subjectsLoading ? (
-              <LoadingState />
-            ) : (
-              <div className="grid gap-6 lg:grid-cols-5">
-                <div className="lg:col-span-3">
-                  <ResponsiveContainer width="100%" height={Math.max(150, chartData.length * 40 + 30)}>
-                    <BarChart data={chartData} layout="vertical" barCategoryGap="30%" margin={{ left: 0, right: 12 }}>
-                      <CartesianGrid horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: '#334155' }} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
-                        labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ''}
-                        formatter={(value, key) => [`${value} ${value === 1 ? 'course' : 'courses'}`, key === 'ready' ? 'Has subjects' : 'No subjects yet']}
-                      />
-                      <Bar dataKey="ready" stackId="c" fill="#059669" isAnimationActive={false} />
-                      <Bar dataKey="empty" stackId="c" fill="#e2e8f0" radius={[0, 4, 4, 0]} isAnimationActive={false} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" />
-                      Has subjects
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-sm bg-slate-200" />
-                      No subjects yet
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4 lg:col-span-2">
-                  {[
-                    { label: 'Courses with subjects', count: withSubjects.length, color: 'bg-emerald-600' },
-                    ...(canClasses ? [{ label: 'Courses with a class running', count: withClasses.length, color: 'bg-amber-500' }] : []),
-                  ].map((m) => (
-                    <div key={m.label}>
-                      <div className="mb-1 flex items-baseline justify-between text-xs">
-                        <span className="text-slate-600">{m.label}</span>
-                        <span className="font-semibold tabular-nums text-slate-900">
-                          {m.count} <span className="font-normal text-slate-400">of {courses.length}</span>
-                        </span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div className={`h-full rounded-full ${m.color}`} style={{ width: `${(m.count / courses.length) * 100}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                  {noCurriculum.length > 0 && (
-                    <div className="border-t border-slate-100 pt-4">
-                      <p className="mb-2 text-xs font-medium text-slate-500">No subjects written yet</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {noCurriculum.map((c) => (
-                          <span key={c.id} title={c.name} className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">
-                            {c.code}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            <div className="grid gap-6 lg:grid-cols-5">
+              <div className="lg:col-span-3">
+                <ResponsiveContainer width="100%" height={Math.max(150, chartData.length * 40 + 30)}>
+                  <BarChart data={chartData} layout="vertical" barCategoryGap="30%" margin={{ left: 0, right: 12 }}>
+                    <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: '#334155' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+                      labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ''}
+                      formatter={(value, key) => [`${value} ${value === 1 ? 'course' : 'courses'}`, key === 'ready' ? 'Has subjects' : 'No subjects yet']}
+                    />
+                    <Bar dataKey="ready" stackId="c" fill="#059669" isAnimationActive={false} />
+                    <Bar dataKey="empty" stackId="c" fill="#e2e8f0" radius={[0, 4, 4, 0]} isAnimationActive={false} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" />
+                    Has subjects
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-slate-200" />
+                    No subjects yet
+                  </span>
                 </div>
               </div>
-            )}
+
+              <div className="space-y-4 lg:col-span-2">
+                {[
+                  { label: 'Courses with subjects', count: withSubjects.length, color: 'bg-emerald-600' },
+                  ...(canClasses ? [{ label: 'Courses with a class running', count: withClasses.length, color: 'bg-amber-500' }] : []),
+                ].map((m) => (
+                  <div key={m.label}>
+                    <div className="mb-1 flex items-baseline justify-between text-xs">
+                      <span className="text-slate-600">{m.label}</span>
+                      <span className="font-semibold tabular-nums text-slate-900">
+                        {m.count} <span className="font-normal text-slate-400">of {courses.length}</span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div className={`h-full rounded-full ${m.color}`} style={{ width: `${(m.count / courses.length) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+                {noCurriculum.length > 0 && (
+                  <div className="border-t border-slate-100 pt-4">
+                    <p className="mb-2 text-xs font-medium text-slate-500">No subjects written yet</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {noCurriculum.map((c) => (
+                        <span key={c.id} title={c.name} className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                          {c.code}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </SectionCard>
 
           <SectionCard

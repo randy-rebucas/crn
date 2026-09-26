@@ -18,6 +18,7 @@ import {
   shortDate,
   useAllPayments,
   useInvoices,
+  usePendingPayments,
 } from './finance-shared';
 import { RecordPaymentForm } from './record-payment-form';
 
@@ -26,15 +27,20 @@ type PaymentFilter = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'all';
 export function PaymentsTab({ createOpen, onCloseCreate }: { createOpen: boolean; onCloseCreate: () => void }) {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading, isError } = useAllPayments();
+  const recentQuery = useAllPayments();
+  // The queue comes from its own uncapped query: the recent list stops at the
+  // 200 newest payments, so an older pending one would otherwise vanish.
+  const pendingQuery = usePendingPayments();
   const invoicesQuery = useInvoices(hasPermission('invoices.view'));
   const canVerify = hasPermission('payments.verify');
 
-  const payments = useMemo(() => data ?? [], [data]);
-  const pendingCount = payments.filter((p) => p.status === 'PENDING').length;
+  const pendingCount = pendingQuery.data?.length ?? 0;
   const [filter, setFilter] = useState<PaymentFilter | null>(null);
   // Land on the verification queue when there's something in it.
   const activeFilter: PaymentFilter = filter ?? (pendingCount > 0 ? 'PENDING' : 'all');
+  const { data, isLoading, isError } = activeFilter === 'PENDING' ? pendingQuery : recentQuery;
+  const payments = useMemo(() => data ?? [], [data]);
+  const recent = useMemo(() => recentQuery.data ?? [], [recentQuery.data]);
   const [search, setSearch] = useState('');
   const [confirmRejectId, setConfirmRejectId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -62,9 +68,9 @@ export function PaymentsTab({ createOpen, onCloseCreate }: { createOpen: boolean
 
   const counts: Record<PaymentFilter, number> = {
     PENDING: pendingCount,
-    VERIFIED: payments.filter((p) => p.status === 'VERIFIED').length,
-    REJECTED: payments.filter((p) => p.status === 'REJECTED').length,
-    all: payments.length,
+    VERIFIED: recent.filter((p) => p.status === 'VERIFIED').length,
+    REJECTED: recent.filter((p) => p.status === 'REJECTED').length,
+    all: recent.length,
   };
 
   const visible = useMemo(() => {
@@ -89,11 +95,11 @@ export function PaymentsTab({ createOpen, onCloseCreate }: { createOpen: boolean
       </Drawer>
 
       {isError && <ErrorState message="Couldn't load payments. Refresh the page to try again." />}
-      {data && payments.length === 0 && (
+      {recentQuery.data && recent.length === 0 && pendingCount === 0 && (
         <EmptyState title="No payments yet" description="Payments recorded against invoices will appear here for verification." />
       )}
 
-      {(isLoading || payments.length > 0) && (
+      {(isLoading || recent.length > 0 || pendingCount > 0) && (
         <Card className="overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
             <FilterChips
@@ -101,7 +107,7 @@ export function PaymentsTab({ createOpen, onCloseCreate }: { createOpen: boolean
               value={activeFilter}
               onChange={setFilter}
               options={[
-                { id: 'PENDING', label: 'To verify', count: counts.PENDING, tone: 'alert' },
+                { id: 'PENDING', label: 'To verify', count: counts.PENDING, alert: true },
                 { id: 'VERIFIED', label: 'Verified', count: counts.VERIFIED },
                 { id: 'REJECTED', label: 'Rejected', count: counts.REJECTED },
                 { id: 'all', label: 'All', count: counts.all },
@@ -216,7 +222,7 @@ export function PaymentsTab({ createOpen, onCloseCreate }: { createOpen: boolean
               </table>
             </div>
           )}
-          {data && data.length >= 200 && (
+          {activeFilter !== 'PENDING' && recent.length >= 200 && (
             <p className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">Showing the 200 most recent payments.</p>
           )}
         </Card>

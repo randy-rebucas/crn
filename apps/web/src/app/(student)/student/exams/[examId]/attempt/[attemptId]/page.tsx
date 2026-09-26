@@ -144,7 +144,10 @@ export default function AttemptPage() {
     );
   }
 
-  if (exam.isError || attempt.isError || !exam.data || !attempt.data) {
+  // Only a failed first load is an error here. A background refetch (e.g. on
+  // window focus) that fails keeps the last good data, and checking isError
+  // instead would unmount a running exam, its timer and its auto-submit.
+  if (!exam.data || !attempt.data) {
     return (
       <StudentShell>
         <BackLink href={examHref}>Exam overview</BackLink>

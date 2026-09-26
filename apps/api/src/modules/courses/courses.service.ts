@@ -13,13 +13,21 @@ export class CoursesService {
     private readonly audit: AuditService,
   ) {}
 
-  async findAllForProgram(user: AuthenticatedUser, programId: string) {
+  // `programId` omitted = every course the caller can reach. Each row carries
+  // its program's name and a subject count (same visibility rule as the
+  // subjects endpoint) so list pages don't need a request per program and
+  // another per course.
+  async findAllForProgram(user: AuthenticatedUser, programId?: string) {
     const programIds = await accessibleProgramIds(this.prisma, user, 'courses.view');
     return this.prisma.course.findMany({
       where: {
         programId,
         program: programWhere(user.organizationId, programIds),
         ...publishedOnlyWhere(user, 'courses.create'),
+      },
+      include: {
+        program: { select: { id: true, name: true } },
+        _count: { select: { subjects: { where: publishedOnlyWhere(user, 'courses.update') } } },
       },
       orderBy: { createdAt: 'desc' },
     });

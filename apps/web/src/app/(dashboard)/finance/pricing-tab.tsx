@@ -99,9 +99,11 @@ function SetPriceForm({
 export function PricingTab({ createOpen, onCloseCreate }: { createOpen: boolean; onCloseCreate: () => void }) {
   const { hasPermission } = useAuth();
   const canSet = hasPermission('pricing.create');
+  const canPrograms = hasPermission('programs.view');
   const programsQuery = useQuery<Program[]>({
     queryKey: ['programs'],
     queryFn: async () => (await apiClient.get('/v1/programs')).data,
+    enabled: canPrograms,
   });
   const pricingQuery = useAllPricing();
   const [search, setSearch] = useState('');
@@ -137,7 +139,7 @@ export function PricingTab({ createOpen, onCloseCreate }: { createOpen: boolean;
     onCloseCreate();
   };
 
-  const isLoading = pricingQuery.isLoading || programsQuery.isLoading;
+  const isLoading = pricingQuery.isLoading || (canPrograms && programsQuery.isLoading);
 
   return (
     <>

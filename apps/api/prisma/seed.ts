@@ -1069,10 +1069,12 @@ async function main() {
     if (!email) return null;
     const userId = emailToUserId.get(email);
     if (!userId) return null;
+    // Demo instructors are listed on the public site so /instructors has
+    // something to show; real profiles start private (isPublic defaults false).
     return prisma.instructorProfile.upsert({
       where: { userId },
-      update: {},
-      create: { userId, organizationId: org.id, branchId, specialization },
+      update: { isPublic: true },
+      create: { userId, organizationId: org.id, branchId, specialization, isPublic: true },
     });
   }
 

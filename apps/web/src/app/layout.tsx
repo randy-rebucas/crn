@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Oswald, Poppins } from "next/font/google";
 import localFont from "next/font/local";
 import { Providers } from "@/lib/providers";
+import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -29,6 +30,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  openGraph: {
+    type: "website",
+    siteName: "OBIAS Nursing & Allied Courses Review Center",
+    locale: "en_PH",
+  },
   title: {
     default: "OBIAS Nursing & Allied Courses Review Center",
     template: "%s | OBIAS Review Center",

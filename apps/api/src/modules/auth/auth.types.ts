@@ -9,6 +9,8 @@ export interface AuthenticatedUser {
   id: string;
   organizationId: string;
   email: string;
+  firstName: string;
+  lastName: string;
   branchIds: string[];
   roles: string[];
   permissions: EffectivePermission[];

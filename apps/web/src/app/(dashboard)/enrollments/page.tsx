@@ -2,13 +2,13 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -77,7 +77,7 @@ const ACTIONS: Record<string, { to: string; label: string; tone: Tone; note?: st
   ],
   APPROVED: [{ to: 'PAYMENT_PENDING', label: 'Request payment', tone: 'primary' }],
   PAYMENT_PENDING: [
-    { to: 'PAYMENT_VERIFIED', label: 'Mark payment verified', tone: 'primary', note: 'Confirm the payment in Finance first' },
+    { to: 'PAYMENT_VERIFIED', label: 'Mark payment verified', tone: 'primary', note: 'Needs a payment verified in Finance' },
     { to: 'CANCELLED', label: 'Cancel', tone: 'danger' },
   ],
   PAYMENT_VERIFIED: [{ to: 'ENROLLED', label: 'Enroll', tone: 'primary', note: 'Notifies the student and opens learning access' }],
@@ -123,10 +123,6 @@ function daysSince(iso: string) {
 
 function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
 }
 
 const icons = {
@@ -300,9 +296,13 @@ function CreateEnrollmentForm({
   existing: Enrollment[];
   onCreated: () => void;
 }) {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
+  const canBranches = hasPermission('branches.view');
+  // Without branches.view there's no branch picker, so fall back to the
+  // staff member's own branch when they work in exactly one.
+  const ownBranchId = user?.branchIds.length === 1 ? user.branchIds[0] : '';
 
   const studentsQuery = useQuery<StudentOption[]>({
     queryKey: ['students'],
@@ -320,12 +320,13 @@ function CreateEnrollmentForm({
   const branchesQuery = useQuery<{ id: string; name: string }[]>({
     queryKey: ['branches'],
     queryFn: async () => (await apiClient.get('/v1/branches')).data,
-    enabled: hasPermission('branches.view'),
+    enabled: canBranches,
   });
+  const showBranchPicker = (branchesQuery.data ?? []).length > 0;
 
   const { register, handleSubmit, control, setValue, formState } = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
-    defaultValues: { studentId: '', programId: '', batchId: '', branchId: '' },
+    defaultValues: { studentId: '', programId: '', batchId: '', branchId: ownBranchId },
   });
   const [studentId, programId, branchId] = useWatch({ control, name: ['studentId', 'programId', 'branchId'] });
 
@@ -349,7 +350,7 @@ function CreateEnrollmentForm({
   const pickStudent = (id: string) => {
     const s = students.find((x) => x.id === id);
     setValue('studentId', id, { shouldValidate: true });
-    if (s?.branchId) setValue('branchId', s.branchId, { shouldValidate: true });
+    setValue('branchId', s?.branchId || ownBranchId, { shouldValidate: true });
   };
 
   const onSubmit = async (values: CreateValues) => {
@@ -425,7 +426,14 @@ function CreateEnrollmentForm({
         </p>
       )}
 
-      {(branchesQuery.data ?? []).length > 0 && (
+      {!showBranchPicker && studentId && !branchId && (
+        <p role="alert" className="-mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          This student has no branch, and you can&apos;t pick one here. Ask someone with access to branches to assign the
+          student a branch first.
+        </p>
+      )}
+
+      {showBranchPicker && (
         <Field label="Branch" error={formState.errors.branchId?.message}>
           <Select {...register('branchId', { onChange: () => setValue('batchId', '') })}>
             <option value="" disabled>

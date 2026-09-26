@@ -11,6 +11,8 @@ const actor: AuthenticatedUser = {
   id: 'actor-1',
   organizationId: 'org-1',
   email: 'actor@example.com',
+  firstName: 'Test',
+  lastName: 'User',
   branchIds: ['branch-1'],
   roles: ['finance_manager'],
   permissions: [
@@ -21,7 +23,7 @@ const actor: AuthenticatedUser = {
   ],
 };
 
-function makeStubs(initialStatus: RefundStatus) {
+function makeStubs(initialStatus: RefundStatus, officerApproverId: string | null = null) {
   const refund = {
     id: 'refund-1',
     status: initialStatus,
@@ -40,6 +42,9 @@ function makeStubs(initialStatus: RefundStatus) {
     },
     payment: {
       findUniqueOrThrow: async () => ({ id: 'payment-1', invoiceId: 'invoice-1' }),
+    },
+    auditLog: {
+      findFirst: async () => (officerApproverId ? { actorId: officerApproverId } : null),
     },
   } as any;
 
@@ -64,6 +69,20 @@ describe('RefundsService transition guard', () => {
     await expect(service.managerApprove(actor, 'refund-1')).rejects.toThrow(
       /Cannot move refund/,
     );
+  });
+
+  it('rejects a manager approval from the same person who officer-approved', async () => {
+    const { service } = makeStubs(RefundStatus.OFFICER_APPROVED, 'actor-1');
+
+    await expect(service.managerApprove(actor, 'refund-1')).rejects.toThrow(/someone other than the officer/);
+  });
+
+  it('allows a manager approval from a different person than the officer', async () => {
+    const { service } = makeStubs(RefundStatus.OFFICER_APPROVED, 'officer-2');
+
+    await expect(service.managerApprove(actor, 'refund-1')).resolves.toMatchObject({
+      status: RefundStatus.APPROVED,
+    });
   });
 
   it('rejects processing a refund that has not been manager-approved', async () => {

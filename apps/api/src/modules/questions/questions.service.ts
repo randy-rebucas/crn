@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateQuestionDto } from './dto/create-question.dto.js';
+import { answerKeyProblem } from './answer-key.js';
 
 // Anyone without `exams.approve` (a reviewer/author of the question bank)
 // must never receive `correctAnswer`/`explanation` in the response body —
@@ -78,6 +79,9 @@ export class QuestionsService {
       where: { id: dto.subjectId, course: { program: { organizationId } } },
     });
     if (!subject) throw new NotFoundException('Subject not found');
+
+    const problem = answerKeyProblem(dto.type, dto.options, dto.correctAnswer);
+    if (problem) throw new BadRequestException(problem);
 
     const question = await this.prisma.question.create({
       data: {

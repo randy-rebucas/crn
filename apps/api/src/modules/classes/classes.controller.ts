@@ -15,13 +15,13 @@ export class ClassesController {
   @Get()
   @RequirePermissions('classes.view')
   findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.classes.findAllForOrganization(user.organizationId);
+    return this.classes.findAll(user);
   }
 
   @Get(':id')
   @RequirePermissions('classes.view')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.classes.findOne(user.organizationId, id);
+    return this.classes.findOne(user, id);
   }
 
   // Gated by `attendance.view` (not `classes.view`) since the roster's
@@ -30,7 +30,7 @@ export class ClassesController {
   @Get(':id/roster')
   @RequirePermissions('attendance.view')
   roster(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.classes.roster(user.organizationId, id);
+    return this.classes.roster(user, id);
   }
 
   @Post()

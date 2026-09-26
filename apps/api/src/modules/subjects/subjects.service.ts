@@ -21,6 +21,9 @@ export class SubjectsService {
         course: { program: programWhere(user.organizationId, programIds) },
         ...publishedOnlyWhere(user, 'courses.update'),
       },
+      // Module count under the same visibility rule, so the curriculum page
+      // can label every subject without a request per subject.
+      include: { _count: { select: { modules: { where: publishedOnlyWhere(user, 'courses.update') } } } },
       orderBy: { createdAt: 'desc' },
     });
   }

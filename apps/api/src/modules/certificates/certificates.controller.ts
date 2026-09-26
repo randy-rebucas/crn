@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { PermissionsGuard } from '../../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator.js';
@@ -28,8 +28,8 @@ export class CertificatesController {
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('certificates.view')
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.certificates.findAllForOrganization(user);
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query('studentId') studentId?: string) {
+    return this.certificates.findAllForOrganization(user, studentId);
   }
 
   @Post()

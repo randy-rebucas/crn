@@ -10,8 +10,8 @@ import {
   moneyCompact,
   outstandingOf,
   paidOf,
-  useAllPayments,
   useInvoices,
+  usePendingPayments,
   useRefunds,
 } from './finance-shared';
 import { InvoicesTab } from './invoices-tab';
@@ -84,7 +84,7 @@ export default function FinancePage() {
   const canInvoices = hasPermission('invoices.view');
   const canPayments = hasPermission('payments.view');
   const invoicesQuery = useInvoices(canInvoices);
-  const paymentsQuery = useAllPayments(canPayments);
+  const pendingQuery = usePendingPayments(canPayments);
   const refundsQuery = useRefunds(hasPermission('refunds.view'));
 
   const invoices = (invoicesQuery.data ?? []).filter((i) => i.status !== 'CANCELLED');
@@ -94,7 +94,7 @@ export default function FinancePage() {
   const outstanding = open.reduce((s, i) => s + outstandingOf(i), 0);
   const overdue = invoices.filter(isOverdue);
   const overdueAmount = overdue.reduce((s, i) => s + outstandingOf(i), 0);
-  const pending = (paymentsQuery.data ?? []).filter((p) => p.status === 'PENDING');
+  const pending = pendingQuery.data ?? [];
   const pendingAmount = pending.reduce((s, p) => s + p.amount, 0);
   const openRefunds = (refundsQuery.data ?? []).filter((r) => !['PROCESSED', 'REJECTED'].includes(r.status)).length;
 
@@ -152,7 +152,7 @@ export default function FinancePage() {
               icon={adminIcons.checkSquare}
               tone={pending.length > 0 ? 'bg-amber-400 text-slate-900' : 'bg-slate-200 text-slate-600'}
               label="Waiting for verification"
-              value={paymentsQuery.isLoading ? '…' : String(pending.length)}
+              value={pendingQuery.isLoading ? '…' : String(pending.length)}
               detail={pending.length > 0 ? `${money(pendingAmount)} recorded, not yet verified` : 'All payments verified'}
               onClick={() => goTo('payments')}
             />

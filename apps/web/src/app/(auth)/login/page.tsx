@@ -1,12 +1,14 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { isAxiosError } from 'axios';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { landingRouteForUser, useAuth } from '@/lib/auth-context';
+import { errorMessage } from '@/lib/errors';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -15,6 +17,31 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+
+// Only a 401 means the credentials were wrong. Calling a throttled request,
+// an outage or a dropped connection "invalid password" sends people off to
+// reset a password that was fine.
+function loginErrorMessage(err: unknown): string {
+  if (!isAxiosError(err)) return 'Something went wrong. Please try again.';
+  const status = err.response?.status;
+  if (!status) return 'Couldn’t reach the server. Check your connection and try again.';
+  if (status === 401) return 'Invalid email or password.';
+  if (status === 429) return 'Too many sign-in attempts. Wait a minute, then try again.';
+  if (status === 403) return errorMessage(err, 'This account can’t sign in right now. Contact the center for help.');
+  return 'Something went wrong on our side. Please try again in a moment.';
+}
+
+// Registration sends people here when its automatic sign-in didn't go
+// through, so they know the account itself was created.
+function RegisteredNotice() {
+  const registered = useSearchParams().get('registered');
+  if (!registered) return null;
+  return (
+    <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800" role="status">
+      Your account was created. Sign in to continue.
+    </p>
+  );
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -36,8 +63,8 @@ export default function LoginPage() {
     try {
       const user = await login(values.email, values.password, values.rememberMe);
       router.replace(landingRouteForUser(user));
-    } catch {
-      setServerError('Invalid email or password.');
+    } catch (err) {
+      setServerError(loginErrorMessage(err));
     }
   };
 
@@ -58,13 +85,21 @@ export default function LoginPage() {
       <h1 className="font-heading text-2xl font-bold text-slate-900">Welcome Back!</h1>
       <p className="mb-6 text-sm text-slate-500">Sign in to your Obias review account.</p>
 
+      <Suspense fallback={null}>
+        <RegisteredNotice />
+      </Suspense>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Email Address</label>
+          <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-slate-700">
+            Email Address
+          </label>
           <div className="relative">
             <IconMail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
+              id="login-email"
               type="email"
+              autoComplete="email"
               placeholder="you@example.com"
               className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
               {...register('email')}
@@ -74,11 +109,15 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+          <label htmlFor="login-password" className="mb-1 block text-sm font-medium text-slate-700">
+            Password
+          </label>
           <div className="relative">
             <IconLock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
+              id="login-password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               placeholder="Enter your password"
               className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-10 text-sm focus:border-brand-maroon focus:outline-none focus:ring-1 focus:ring-brand-maroon"
               {...register('password')}

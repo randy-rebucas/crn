@@ -2,11 +2,12 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
+import { humanize } from '@/lib/format';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui';
 import { icons as baseIcons } from '@/components/student-ui';
 import { adminIcons } from '@/components/admin-shell';
+import { FormError } from '@/components/admin-kit';
 
 const STAFF_STATUSES = ['ACTIVE', 'ON_LEAVE', 'ARCHIVED'] as const;
 type StaffStatus = (typeof STAFF_STATUSES)[number];
@@ -50,15 +52,6 @@ interface OrgUser {
 }
 
 type StatusFilter = 'all' | StaffStatus;
-
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
-}
-
-function humanize(value: string) {
-  const text = value.replace(/_/g, ' ').toLowerCase();
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 function tenure(hireDate: string) {
   const start = new Date(hireDate);
@@ -112,11 +105,6 @@ function DrawerSkeleton() {
       ))}
     </div>
   );
-}
-
-function FormError({ message }: { message: string | null }) {
-  if (!message) return null;
-  return <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p>;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,16 +187,18 @@ function CreateStaffForm({
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Branch">
-            <Select {...register('branchId')}>
-              <option value="">Unassigned</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {branches.length > 0 && (
+            <Field label="Branch">
+              <Select {...register('branchId')}>
+                <option value="">Unassigned</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="Hire date">
             <Input type="date" {...register('hireDate')} />
           </Field>
@@ -274,7 +264,8 @@ function EditStaffForm({
         position: values.position,
         // Blank clears: `null` unassigns the branch / removes the department.
         department: values.department?.trim() || null,
-        branchId: values.branchId || null,
+        // Without a branch picker, leave the current assignment untouched.
+        ...(branches.length > 0 ? { branchId: values.branchId || null } : {}),
         status: values.status,
       });
       onSaved();
@@ -308,16 +299,18 @@ function EditStaffForm({
           <option key={d} value={d} />
         ))}
       </datalist>
-      <Field label="Branch">
-        <Select {...register('branchId')}>
-          <option value="">Unassigned</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      {branches.length > 0 && (
+        <Field label="Branch">
+          <Select {...register('branchId')}>
+            <option value="">Unassigned</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
 
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-slate-700">Status</legend>
@@ -365,11 +358,13 @@ export default function StaffPage() {
     queryFn: async () => (await apiClient.get('/v1/staff')).data,
   });
 
-  // Loaded up front (when allowed) so the table can show branch names, not ids.
+  // Loaded up front (when allowed) so the table can show branch names, not
+  // ids. Without branches.view the forms simply omit the branch picker —
+  // fetching anyway would 403 and block adding staff altogether.
   const branchesQuery = useQuery<Branch[]>({
     queryKey: ['branches'],
     queryFn: async () => (await apiClient.get('/v1/branches')).data,
-    enabled: canBranches || showForm || editing !== null,
+    enabled: canBranches,
   });
 
   const usersQuery = useQuery<OrgUser[]>({
@@ -420,7 +415,7 @@ export default function StaffPage() {
   ];
 
   const tabs: StatusFilter[] = ['all', 'ACTIVE', 'ON_LEAVE', 'ARCHIVED'];
-  const lookupsLoading = branchesQuery.isLoading || usersQuery.isLoading;
+  const lookupsLoading = (canBranches && branchesQuery.isLoading) || usersQuery.isLoading;
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['staff'] });
 
@@ -441,10 +436,10 @@ export default function StaffPage() {
 
       <Drawer open={showForm} onClose={() => setShowForm(false)} title="Add staff member">
         {lookupsLoading && <DrawerSkeleton />}
-        {!lookupsLoading && (branchesQuery.isError || usersQuery.isError) && (
-          <ErrorState message="Couldn't load users or branches. Close this panel and try again." />
+        {!lookupsLoading && usersQuery.isError && (
+          <ErrorState message="Couldn't load user accounts. Adding staff needs the users.manage permission to list them." />
         )}
-        {!lookupsLoading && !branchesQuery.isError && !usersQuery.isError && (
+        {!lookupsLoading && !usersQuery.isError && (
           <CreateStaffForm
             users={availableUsers}
             branches={branchesQuery.data ?? []}
@@ -458,8 +453,8 @@ export default function StaffPage() {
       </Drawer>
 
       <Drawer open={editing !== null} onClose={() => setEditing(null)} title="Edit staff member">
-        {branchesQuery.isLoading && <DrawerSkeleton />}
-        {editing && !branchesQuery.isLoading && (
+        {canBranches && branchesQuery.isLoading && <DrawerSkeleton />}
+        {editing && !(canBranches && branchesQuery.isLoading) && (
           <EditStaffForm
             key={editing.id}
             member={editing}

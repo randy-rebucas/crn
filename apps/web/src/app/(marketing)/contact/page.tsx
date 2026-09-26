@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { EnrollmentForm } from './enrollment-form';
+import { ADDITIONAL_OFFERINGS, FALLBACK_REVIEW_PROGRAMS } from '../offerings/additional-offerings';
+import { listPrograms } from '@/lib/public-api';
 import { fetchPublicSettings, phonesOf } from '@/lib/public-settings';
 
 export const metadata: Metadata = {
@@ -8,8 +10,12 @@ export const metadata: Metadata = {
 };
 
 export default async function ContactPage() {
-  const contact = await fetchPublicSettings();
+  // The inquiry form must stay usable during an API outage, so the program
+  // list falls back rather than failing the page.
+  const [contact, programs] = await Promise.all([fetchPublicSettings(), listPrograms().catch(() => [])]);
   const phones = phonesOf(contact);
+  const reviewPrograms = programs.length > 0 ? programs.map((p) => p.name) : FALLBACK_REVIEW_PROGRAMS;
+  const programOptions = [...reviewPrograms, ...ADDITIONAL_OFFERINGS.map((o) => o.name)];
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
@@ -21,7 +27,7 @@ export default async function ContactPage() {
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-brand-cream p-6">
-          <EnrollmentForm />
+          <EnrollmentForm programOptions={programOptions} />
         </div>
 
         <div className="text-sm text-slate-600">

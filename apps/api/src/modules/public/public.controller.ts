@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PublicService } from './public.service.js';
 import { CreatePublicLeadDto } from './dto/create-public-lead.dto.js';
 import { RegisterStudentDto } from './dto/register-student.dto.js';
@@ -8,6 +9,12 @@ import { RegisterStudentDto } from './dto/register-student.dto.js';
 // narrow: write-only lead capture, or reads that are already filtered to
 // PUBLISHED/active rows in the service layer — never a passthrough to
 // tenant-internal data.
+//
+// Reads get a higher ceiling than the global 100/min: most of them arrive
+// from the Next.js server rendering pages, so one address stands in for
+// many visitors. The two writes get a much lower one, since each creates a
+// row staff have to deal with.
+@Throttle({ default: { ttl: 60_000, limit: 600 } })
 @Controller('v1/public')
 export class PublicController {
   constructor(private readonly publicService: PublicService) {}
@@ -68,11 +75,13 @@ export class PublicController {
   }
 
   @Post('leads')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   createLead(@Body() dto: CreatePublicLeadDto) {
     return this.publicService.createLead(dto);
   }
 
   @Post('register')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @HttpCode(HttpStatus.CREATED)
   register(@Body() dto: RegisterStudentDto) {
     return this.publicService.registerStudent(dto);

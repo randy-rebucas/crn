@@ -1,13 +1,13 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -42,6 +42,7 @@ interface Subject {
   courseId: string;
   description?: string | null;
   status?: ContentStatus;
+  _count?: { modules: number };
 }
 interface ModuleRecord {
   id: string;
@@ -230,10 +231,6 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
-}
-
 function byPosition<T extends { position: number }>(list: T[] | undefined) {
   return [...(list ?? [])].sort((a, b) => a.position - b.position);
 }
@@ -373,10 +370,14 @@ function NameForm({ target, onDone }: { target: Exclude<CreateTarget, { kind: 'm
         await queryClient.invalidateQueries({ queryKey: ['subjects', target.courseId] });
       } else if (target.kind === 'module') {
         await apiClient.post('/v1/modules', { subjectId: target.subjectId, name: values.name });
-        await queryClient.invalidateQueries({ queryKey: ['modules', target.subjectId] });
+        // The subject list shows module counts, so refresh it with the outline.
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['curriculum-outline', target.subjectId] }),
+          queryClient.invalidateQueries({ queryKey: ['subjects'] }),
+        ]);
       } else {
         await apiClient.post('/v1/lessons', { moduleId: target.moduleId, name: values.name });
-        await queryClient.invalidateQueries({ queryKey: ['lessons', target.moduleId] });
+        await queryClient.invalidateQueries({ queryKey: ['curriculum-outline'] });
       }
       onDone();
     } catch (err) {
@@ -445,7 +446,7 @@ function MaterialForm({ target, onDone }: { target: Extract<CreateTarget, { kind
         type: values.type,
         content: values.content?.trim() || undefined,
       });
-      await queryClient.invalidateQueries({ queryKey: ['materials', target.lessonId] });
+      await queryClient.invalidateQueries({ queryKey: ['curriculum-outline'] });
       onDone();
     } catch (err) {
       setServerError(errorMessage(err, 'Could not add the material. Try again.'));
@@ -546,7 +547,7 @@ function MaterialRow({ material, canManage }: { material: MaterialRecord; canMan
         endpoint="/v1/materials"
         id={material.id}
         status={material.status}
-        invalidateKey={['materials', material.lessonId]}
+        invalidateKey={['curriculum-outline']}
         canManage={canManage}
       />
     </li>
@@ -591,7 +592,7 @@ function LessonRow({
           endpoint="/v1/lessons"
           id={lesson.id}
           status={lesson.status}
-          invalidateKey={['lessons', lesson.moduleId]}
+          invalidateKey={['curriculum-outline']}
           canManage={canManage}
         />
       </div>
@@ -676,7 +677,7 @@ function ModuleBlock({
           endpoint="/v1/modules"
           id={mod.id}
           status={mod.status}
-          invalidateKey={['modules', mod.subjectId]}
+          invalidateKey={['curriculum-outline']}
           canManage={canManage}
         />
       </div>
@@ -725,33 +726,25 @@ function SubjectWorkspace({
   canManage: boolean;
   onCreate: (t: CreateTarget) => void;
 }) {
-  const modulesQuery = useQuery<ModuleRecord[]>({
-    queryKey: ['modules', subject.id],
-    queryFn: async () => (await apiClient.get('/v1/modules', { params: { subjectId: subject.id } })).data,
+  // The whole module > lesson > material tree in one request (it used to be
+  // one per module plus one per lesson).
+  const outlineQuery = useQuery<(ModuleRecord & { lessons: (LessonRecord & { materials: MaterialRecord[] })[] })[]>({
+    queryKey: ['curriculum-outline', subject.id],
+    queryFn: async () => (await apiClient.get('/v1/modules/outline', { params: { subjectId: subject.id } })).data,
   });
-  const modules = byPosition(modulesQuery.data);
+  const modules = byPosition(outlineQuery.data);
 
-  const lessonQueries = useQueries({
-    queries: modules.map((m) => ({
-      queryKey: ['lessons', m.id],
-      queryFn: async (): Promise<LessonRecord[]> => (await apiClient.get('/v1/lessons', { params: { moduleId: m.id } })).data,
-    })),
-  });
-  const lessonsByModule = new Map(modules.map((m, i) => [m.id, lessonQueries[i]?.data ? byPosition(lessonQueries[i].data) : undefined]));
+  const lessonsByModule = new Map<string, LessonRecord[] | undefined>(
+    (outlineQuery.data ?? []).map((m) => [m.id, byPosition(m.lessons)]),
+  );
   const allLessons = [...lessonsByModule.values()].flatMap((l) => l ?? []);
 
-  const materialQueries = useQueries({
-    queries: allLessons.map((l) => ({
-      queryKey: ['materials', l.id],
-      queryFn: async (): Promise<MaterialRecord[]> => (await apiClient.get('/v1/materials', { params: { lessonId: l.id } })).data,
-    })),
-  });
-  const materialsByLesson = new Map(
-    allLessons.map((l, i) => [l.id, materialQueries[i]?.data ? byPosition(materialQueries[i].data) : undefined]),
+  const materialsByLesson = new Map<string, MaterialRecord[] | undefined>(
+    (outlineQuery.data ?? []).flatMap((m) => m.lessons.map((l) => [l.id, byPosition(l.materials)] as const)),
   );
   const allMaterials = [...materialsByLesson.values()].flatMap((m) => m ?? []);
 
-  const loadingTree = modulesQuery.isLoading || lessonQueries.some((q) => q.isLoading);
+  const loadingTree = outlineQuery.isLoading;
   const everything = [...modules, ...allLessons, ...allMaterials];
   const liveShare = everything.length
     ? Math.round((everything.filter((i) => i.status === 'PUBLISHED').length / everything.length) * 100)
@@ -842,7 +835,7 @@ function SubjectWorkspace({
           </SectionCard>
 
           <SectionCard icon={icons.paperclip} title="Materials by type" className="xl:col-span-2">
-            {loadingTree || materialQueries.some((q) => q.isLoading) ? (
+            {loadingTree ? (
               <LoadingState />
             ) : typeCounts.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-500">No materials yet.</p>
@@ -871,9 +864,9 @@ function SubjectWorkspace({
       )}
 
       <SectionCard icon={icons.layers} title="Outline" meta={modules.length ? `${modules.length} ${modules.length === 1 ? 'module' : 'modules'}` : undefined}>
-        {modulesQuery.isLoading && <LoadingState />}
-        {modulesQuery.isError && <ErrorState message="Could not load modules. Refresh the page to try again." />}
-        {!modulesQuery.isLoading && !modulesQuery.isError && modules.length === 0 && (
+        {outlineQuery.isLoading && <LoadingState />}
+        {outlineQuery.isError && <ErrorState message="Could not load modules. Refresh the page to try again." />}
+        {!outlineQuery.isLoading && !outlineQuery.isError && modules.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 py-12 text-center">
             <span className="mb-2 text-slate-300">{icons.layers}</span>
             <p className="text-sm font-medium text-slate-700">No modules in this subject yet</p>
@@ -917,11 +910,25 @@ export default function CurriculumPage() {
   const [createTarget, setCreateTarget] = useState<CreateTarget | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const programsQuery = useQuery<Program[]>({
+  const canPrograms = hasPermission('programs.view');
+  const programsListQuery = useQuery<Program[]>({
     queryKey: ['programs'],
     queryFn: async () => (await apiClient.get('/v1/programs')).data,
+    enabled: canPrograms,
   });
-  const effectiveProgramId = programId || programsQuery.data?.[0]?.id || '';
+  // Without programs.view (this page only needs courses.view), the program
+  // picker is built from the programs of the courses the viewer can see.
+  const allCoursesQuery = useQuery<(Course & { program: Program })[]>({
+    queryKey: ['courses', 'all'],
+    queryFn: async () => (await apiClient.get('/v1/courses')).data,
+    enabled: !canPrograms,
+  });
+  const programs: Program[] = canPrograms
+    ? (programsListQuery.data ?? [])
+    : [...new Map((allCoursesQuery.data ?? []).map((c) => [c.program.id, c.program])).values()];
+  const programsLoading = canPrograms ? programsListQuery.isLoading : allCoursesQuery.isLoading;
+  const programsError = canPrograms ? programsListQuery.isError : allCoursesQuery.isError;
+  const effectiveProgramId = programId || programs[0]?.id || '';
 
   const coursesQuery = useQuery<Course[]>({
     queryKey: ['courses', effectiveProgramId],
@@ -937,15 +944,6 @@ export default function CurriculumPage() {
   });
   const subjects = subjectsQuery.data ?? [];
   const selectedSubject = subjects.find((s) => s.id === subjectId) ?? subjects[0];
-
-  // Every level's module counts come from the same cache the workspace fills,
-  // so the subject list can show them without a second round of requests.
-  const moduleCounts = useQueries({
-    queries: subjects.map((s) => ({
-      queryKey: ['modules', s.id],
-      queryFn: async (): Promise<ModuleRecord[]> => (await apiClient.get('/v1/modules', { params: { subjectId: s.id } })).data,
-    })),
-  });
 
   const openCreate = (t: CreateTarget) => {
     setCreateTarget(t);
@@ -969,9 +967,9 @@ export default function CurriculumPage() {
                 setCourseId('');
                 setSubjectId('');
               }}
-              disabled={programsQuery.isLoading}
+              disabled={programsLoading}
             >
-              {(programsQuery.data ?? []).map((p) => (
+              {programs.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -1005,8 +1003,8 @@ export default function CurriculumPage() {
         ) : null}
       </Drawer>
 
-      {programsQuery.isError && <ErrorState message="Could not load programs. Refresh the page to try again." />}
-      {!effectiveProgramId && !programsQuery.isLoading && !programsQuery.isError && (
+      {programsError && <ErrorState message="Could not load programs. Refresh the page to try again." />}
+      {!effectiveProgramId && !programsLoading && !programsError && (
         <EmptyState title="No programs yet" description="Create a program on the Programs page first." />
       )}
       {effectiveProgramId && !effectiveCourseId && !coursesQuery.isLoading && (
@@ -1047,9 +1045,9 @@ export default function CurriculumPage() {
             )}
             {subjects.length > 0 && (
               <ul className="-mx-2 space-y-0.5">
-                {subjects.map((s, i) => {
+                {subjects.map((s) => {
                   const on = selectedSubject?.id === s.id;
-                  const count = moduleCounts[i]?.data?.length;
+                  const count = s._count?.modules;
                   return (
                     <li key={s.id}>
                       <button

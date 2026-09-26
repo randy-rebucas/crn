@@ -4,31 +4,60 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { landingRouteForUser, useAuth } from '@/lib/auth-context';
 import { useInstructorName, useRoleLabel } from '@/lib/instructor-hooks';
-import { useMarkNotificationRead, useMyNotifications } from '@/lib/student-hooks';
+import { timeAgo } from '@/lib/instructor-schedule';
+import { useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications } from '@/lib/student-hooks';
 import { adminIcons as icons } from '@/components/admin-shell';
 
 // Distinct from (dashboard)'s sidebar and (student)'s bottom tab bar: a
 // horizontal top bar sized for a desk/tablet workflow between classes
 // (blueprint Section 17). Same red-700/slate operate palette as the other
 // portals. Gating stays permission-based, same as (dashboard)/layout.tsx,
-// not a hardcoded role check.
-const NAV_ITEMS: { label: string; href: string; icon: React.ReactNode; permission?: string }[] = [
+// not a hardcoded role check. A section lists every key its page's requests
+// need (attendance is fetched per class, so it needs classes.view too).
+const NAV_ITEMS: { label: string; href: string; icon: React.ReactNode; permissions?: string[] }[] = [
   { label: 'Today', href: '/instructor', icon: icons.home },
-  { label: 'Classes', href: '/instructor/classes', icon: icons.learn, permission: 'classes.view' },
-  { label: 'Attendance', href: '/instructor/attendance', icon: icons.users, permission: 'attendance.view' },
-  { label: 'Grading', href: '/instructor/grading', icon: icons.clipboardCheck, permission: 'exams.grade' },
+  { label: 'Classes', href: '/instructor/classes', icon: icons.learn, permissions: ['classes.view'] },
+  {
+    label: 'Attendance',
+    href: '/instructor/attendance',
+    icon: icons.users,
+    permissions: ['attendance.view', 'classes.view'],
+  },
+  {
+    label: 'Grading',
+    href: '/instructor/grading',
+    icon: icons.clipboardCheck,
+    permissions: ['exams.grade', 'exams.view'],
+  },
 ];
 
-function useClickOutside<T extends HTMLElement>(onOutside: () => void) {
+// Pages are gated the same way as (dashboard)/layout.tsx: longest-prefix
+// match against the nav, so a direct URL to a section the account can't use
+// redirects instead of rendering a page whose every request 403s.
+function requiredPermissionsFor(pathname: string): string[] | undefined {
+  const match = NAV_ITEMS.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)).sort(
+    (a, b) => b.href.length - a.href.length,
+  )[0];
+  return match?.permissions;
+}
+
+// Menu popover state: closes on outside click or Escape, and Escape hands
+// focus back to the trigger so keyboard users aren't dropped on <body>.
+function useMenu<T extends HTMLElement>() {
+  const [open, setOpen] = useState(false);
   const ref = useRef<T>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    if (!open) return;
     function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onOutside();
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onOutside();
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
     }
     document.addEventListener('mousedown', handle);
     document.addEventListener('keydown', onKey);
@@ -36,32 +65,22 @@ function useClickOutside<T extends HTMLElement>(onOutside: () => void) {
       document.removeEventListener('mousedown', handle);
       document.removeEventListener('keydown', onKey);
     };
-  }, [onOutside]);
-  return ref;
-}
-
-function timeAgo(iso: string) {
-  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  }, [open]);
+  return { open, setOpen, ref, triggerRef };
 }
 
 function NotificationsMenu() {
-  const [open, setOpen] = useState(false);
-  const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
+  const { open, setOpen, ref, triggerRef } = useMenu<HTMLDivElement>();
   const notifications = useMyNotifications();
   const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
   const items = (notifications.data ?? []).slice(0, 6);
   const unread = (notifications.data ?? []).filter((n) => !n.readAt).length;
 
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -80,7 +99,16 @@ function NotificationsMenu() {
         <div className="absolute right-0 top-full z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_12px_32px_-12px_rgb(15_23_42/0.25)]">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <span className="text-sm font-semibold text-slate-900">Notifications</span>
-            {unread > 0 && <span className="text-xs text-slate-500">{unread} unread</span>}
+            {unread > 0 && (
+              <button
+                type="button"
+                onClick={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending}
+                className="rounded text-xs font-semibold text-blue-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:opacity-50"
+              >
+                Mark all read ({unread})
+              </button>
+            )}
           </div>
           {notifications.isLoading && <p className="px-4 py-6 text-sm text-slate-500">Loading…</p>}
           {notifications.isError && (
@@ -91,13 +119,9 @@ function NotificationsMenu() {
           )}
           {items.length > 0 && (
             <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
-              {items.map((n) => (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => !n.readAt && markRead.mutate(n.id)}
-                    className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
-                  >
+              {items.map((n) => {
+                const content = (
+                  <>
                     <span
                       className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.readAt ? 'bg-transparent' : 'bg-red-600'}`}
                       aria-hidden
@@ -109,9 +133,27 @@ function NotificationsMenu() {
                       {n.body && <span className="mt-0.5 block truncate text-xs text-slate-500">{n.body}</span>}
                       <span className="mt-1 block text-[11px] text-slate-400">{timeAgo(n.createdAt)}</span>
                     </span>
-                  </button>
-                </li>
-              ))}
+                  </>
+                );
+                // Notifications carry no link target, so the only action is
+                // marking one read — a read row is plain text, not a dead button.
+                return (
+                  <li key={n.id}>
+                    {n.readAt ? (
+                      <div className="flex items-start gap-3 px-4 py-3">{content}</div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => markRead.mutate(n.id)}
+                        aria-label={`${n.title}. Mark as read`}
+                        className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red-700"
+                      >
+                        {content}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -125,8 +167,7 @@ function AccountMenu() {
   const router = useRouter();
   const name = useInstructorName();
   const role = useRoleLabel();
-  const [open, setOpen] = useState(false);
-  const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
+  const { open, setOpen, ref, triggerRef } = useMenu<HTMLDivElement>();
   const initials = name.full
     .split(/\s+/)
     .slice(0, 2)
@@ -141,6 +182,7 @@ function AccountMenu() {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -182,11 +224,23 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const router = useRouter();
   const pathname = usePathname();
 
+  const canUse = (permissions?: string[]) => !permissions || permissions.every((p) => hasPermission(p));
+  const isAllowed = canUse(requiredPermissionsFor(pathname));
+  // Someone with no instructor section at all (a student, an admin typing the
+  // URL) belongs in their own portal, not on an empty "Today" page.
+  const hasAnySection = NAV_ITEMS.some((item) => item.permissions && canUse(item.permissions));
+  const home = user ? landingRouteForUser(user) : '/login';
+  const redirectTo = !user ? null : !hasAnySection && home !== '/instructor' ? home : !isAllowed ? '/instructor' : null;
+
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace('/login');
     }
   }, [isLoading, user, router]);
+
+  useEffect(() => {
+    if (!isLoading && redirectTo) router.replace(redirectTo);
+  }, [isLoading, redirectTo, router]);
 
   // The phone nav scrolls sideways; keep the current section in view.
   const mobileNavRef = useRef<HTMLElement>(null);
@@ -194,11 +248,11 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     mobileNavRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   }, [pathname, user]);
 
-  if (isLoading || !user) {
+  if (isLoading || !user || redirectTo) {
     return <div className="flex flex-1 items-center justify-center bg-slate-50 text-sm text-slate-500">Loading…</div>;
   }
 
-  const visibleItems = NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission));
+  const visibleItems = NAV_ITEMS.filter((item) => canUse(item.permissions));
 
   const nav = visibleItems.map((item) => {
     const active =

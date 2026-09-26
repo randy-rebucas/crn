@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { PermissionsGuard } from '../../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator.js';
@@ -14,8 +14,8 @@ export class InvoicesController {
 
   @Get()
   @RequirePermissions('invoices.view')
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.invoices.findAllForOrganization(user);
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query('studentId') studentId?: string) {
+    return this.invoices.findAllForOrganization(user, studentId);
   }
 
   @Get(':id')

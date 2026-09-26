@@ -23,6 +23,13 @@ export class ModulesController {
     return this.curriculum.findModulesForSubject(user, subjectId);
   }
 
+  @Get('v1/modules/outline')
+  @RequirePermissions('courses.view')
+  outline(@CurrentUser() user: AuthenticatedUser, @Query('subjectId') subjectId: string) {
+    if (!subjectId) throw new BadRequestException('subjectId is required');
+    return this.curriculum.findOutlineForSubject(user, subjectId);
+  }
+
   @Post('v1/modules')
   @RequirePermissions('courses.update')
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateModuleDto) {

@@ -2,13 +2,13 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -156,10 +156,6 @@ const KIND_ICON: Record<Kind, React.ReactNode> = {
 
 const MARKDOWN_PROSE =
   'space-y-1.5 text-sm leading-relaxed text-slate-600 [&_a]:text-red-700 [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_strong]:font-semibold [&_strong]:text-slate-800';
-
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
-}
 
 function formatDate(iso?: string | null) {
   if (!iso) return null;

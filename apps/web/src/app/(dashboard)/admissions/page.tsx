@@ -2,13 +2,13 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import { useAuth } from '@/lib/auth-context';
 import {
   Button,
@@ -75,10 +75,6 @@ const ACTIONS: Record<AdmissionStatus, { action: ReviewAction; label: string }[]
   APPROVED: [],
   REJECTED: [],
 };
-
-function errorMessage(err: unknown, fallback: string) {
-  return (isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ?? fallback;
-}
 
 function daysBetween(from: string, to: Date | string = new Date()) {
   const end = typeof to === 'string' ? new Date(to) : to;
@@ -421,10 +417,13 @@ export default function AdmissionsPage() {
     queryFn: async () => (await apiClient.get('/v1/leads')).data,
     enabled: showForm,
   });
+  // Optional here (the program can be decided later), so skip it rather
+  // than fail the whole form when the viewer lacks programs.view.
+  const canPrograms = hasPermission('programs.view');
   const programsQuery = useQuery<Program[]>({
     queryKey: ['programs'],
     queryFn: async () => (await apiClient.get('/v1/programs')).data,
-    enabled: showForm,
+    enabled: showForm && canPrograms,
   });
 
   const admissions = admissionsQuery.data ?? [];
@@ -466,7 +465,7 @@ export default function AdmissionsPage() {
     ...STATUSES.map((s) => ({ key: s, label: STATUS_META[s].label, count: admissions.filter((a) => a.status === s).length, color: STATUS_META[s].color })),
   ].filter((c) => c.key === 'ALL' || c.count > 0);
 
-  const loadingLookups = leadsQuery.isLoading || programsQuery.isLoading;
+  const loadingLookups = leadsQuery.isLoading || (canPrograms && programsQuery.isLoading);
 
   return (
     <div>
@@ -485,10 +484,10 @@ export default function AdmissionsPage() {
 
       <Drawer open={showForm} onClose={() => setShowForm(false)} title="Start an admission review">
         {loadingLookups && <LoadingState />}
-        {!loadingLookups && (leadsQuery.isError || programsQuery.isError) && (
-          <ErrorState message="Could not load leads or programs. Close this panel and try again." />
+        {!loadingLookups && leadsQuery.isError && (
+          <ErrorState message="Could not load leads. Close this panel and try again." />
         )}
-        {showForm && !loadingLookups && !leadsQuery.isError && !programsQuery.isError && (
+        {showForm && !loadingLookups && !leadsQuery.isError && (
           <CreateAdmissionForm
             leads={eligibleLeads}
             programs={programsQuery.data ?? []}

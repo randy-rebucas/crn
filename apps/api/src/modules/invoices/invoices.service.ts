@@ -17,9 +17,15 @@ export class InvoicesService {
   // Scoped by `invoices.view` (blueprint Section 8: branch-specific
   // financial visibility) — a Finance Officer only sees their own branch's
   // invoices, never the whole organization's.
-  findAllForOrganization(user: AuthenticatedUser) {
+  // `studentId` narrows to one student's invoices (the student detail page),
+  // inside the same scope — AND'd so it can't widen or replace the scope filter.
+  findAllForOrganization(user: AuthenticatedUser, studentId?: string) {
     return this.prisma.invoice.findMany({
-      where: { organizationId: user.organizationId, ...branchScopeWhere(user, 'invoices.view') },
+      where: {
+        organizationId: user.organizationId,
+        ...branchScopeWhere(user, 'invoices.view'),
+        ...(studentId ? { AND: [{ enrollment: { studentId } }] } : {}),
+      },
       include: {
         // Processed refunds come along so clients can show the same net-paid
         // figure recomputeStatus uses (verified payments minus paid-out refunds).

@@ -1,7 +1,8 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { apiClient, setAccessToken } from './api-client';
+import { apiClient, setAccessToken, setRefreshHandler } from './api-client';
 
 interface EffectivePermission {
   key: string;
@@ -12,6 +13,8 @@ interface AuthUser {
   id: string;
   organizationId: string;
   email: string;
+  firstName: string;
+  lastName: string;
   branchIds: string[];
   roles: string[];
   permissions: EffectivePermission[];
@@ -76,6 +79,7 @@ function refreshSessionOnce(refreshToken: string, rememberMe: boolean): Promise<
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   // Only start "loading" if there's actually a session to restore — this
   // way the no-token branch below needs no setState at all, so the effect
@@ -114,6 +118,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     restoreSession();
   }, [restoreSession]);
 
+  // Lets api-client recover from an expired access token mid-session: trade
+  // the stored refresh token for a new pair and retry the failed request. If
+  // the refresh token is gone or rejected, the session ends here and the
+  // route layouts send the user back to /login.
+  useEffect(() => {
+    setRefreshHandler(async () => {
+      const refreshToken = getStoredRefreshToken();
+      if (!refreshToken) {
+        setAccessToken(null);
+        setUser(null);
+        queryClient.clear();
+        return null;
+      }
+      const rememberMe = !!localStorage.getItem(REFRESH_TOKEN_KEY);
+      try {
+        const { data } = await apiClient.post('/v1/auth/refresh', { refreshToken });
+        setAccessToken(data.accessToken);
+        storeRefreshToken(data.refreshToken, rememberMe);
+        return data.accessToken as string;
+      } catch {
+        // Same rule as restoreSession: only tear down if nothing else has
+        // already rotated the token in the meantime.
+        if (getStoredRefreshToken() === refreshToken) {
+          clearStoredRefreshToken();
+          setAccessToken(null);
+          setUser(null);
+          queryClient.clear();
+        }
+        return null;
+      }
+    });
+    return () => setRefreshHandler(null);
+  }, [queryClient]);
+
   const login = useCallback(async (email: string, password: string, rememberMe = true) => {
     const { data } = await apiClient.post('/v1/auth/login', { email, password });
     setAccessToken(data.accessToken);
@@ -130,7 +168,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearStoredRefreshToken();
     setAccessToken(null);
     setUser(null);
-  }, []);
+    // Query keys aren't per-user ('my-attempts', 'notifications', ...), and
+    // the client outlives the session, so the next person to sign in on this
+    // tab would otherwise see this account's cached data until refetches land.
+    queryClient.clear();
+  }, [queryClient]);
 
   const hasPermission = useCallback(
     (key: string) => Boolean(user?.permissions.some((p) => p.key === key)),

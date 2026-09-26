@@ -1,32 +1,13 @@
 import type { Metadata } from 'next';
-import { API_BASE_URL } from '@/lib/api-client';
+import { listSuccessStories } from '@/lib/public-api';
 
 export const metadata: Metadata = {
   title: 'Success Stories',
   description: 'Real graduates, real results — success stories from OBIAS Nursing & Allied Courses Review Center.',
 };
 
-interface PublicSuccessStory {
-  id: string;
-  graduateName: string;
-  programName: string;
-  year: number | null;
-  testimonial: string;
-  photoUrl: string | null;
-}
-
-async function getSuccessStories(): Promise<PublicSuccessStory[]> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/success-stories`, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
-    return res.json();
-  } catch {
-    return [];
-  }
-}
-
 export default async function SuccessStoriesPage() {
-  const stories = await getSuccessStories();
+  const stories = await listSuccessStories();
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">

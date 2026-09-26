@@ -86,12 +86,30 @@ function CreateQuestionForm({ onCreated }: { onCreated: () => void }) {
       setServerError('Add at least two answer options.');
       return;
     }
-    if (type === 'MULTIPLE_RESPONSE' && correctOptionIndexes.length === 0) {
-      setServerError('Mark at least one option as correct.');
+    // Blank options are dropped on save, so a correct mark on one would leave
+    // an answer key pointing at nothing and every student marked wrong.
+    const blankIndex = (i: number) => !optionTexts[i]?.trim();
+    if (type === 'MULTIPLE_CHOICE' && blankIndex(correctOptionIndex)) {
+      setServerError(`Option ${LETTERS[correctOptionIndex]} is marked correct but has no text.`);
       return;
+    }
+    if (type === 'MULTIPLE_RESPONSE') {
+      if (correctOptionIndexes.length === 0) {
+        setServerError('Mark at least one option as correct.');
+        return;
+      }
+      const blankCorrect = correctOptionIndexes.find(blankIndex);
+      if (blankCorrect !== undefined) {
+        setServerError(`Option ${LETTERS[blankCorrect]} is marked correct but has no text.`);
+        return;
+      }
     }
     if ((type === 'IDENTIFICATION' || type === 'NUMERICAL') && !textAnswer.trim()) {
       setServerError('Enter the correct answer so it can be auto-graded.');
+      return;
+    }
+    if (type === 'NUMERICAL' && !Number.isFinite(Number(textAnswer.trim()))) {
+      setServerError('The correct answer must be a number, e.g. 12 or 0.5.');
       return;
     }
 
@@ -107,7 +125,7 @@ function CreateQuestionForm({ onCreated }: { onCreated: () => void }) {
         correctAnswer = trueFalseAnswer === 'true';
         break;
       case 'NUMERICAL':
-        correctAnswer = Number(textAnswer);
+        correctAnswer = Number(textAnswer.trim());
         break;
       default:
         correctAnswer = textAnswer;
@@ -258,7 +276,14 @@ function CreateQuestionForm({ onCreated }: { onCreated: () => void }) {
                 key={v}
                 className="flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50 has-[:checked]:text-emerald-800"
               >
-                <input type="radio" className="sr-only" checked={trueFalseAnswer === v} onChange={() => setTrueFalseAnswer(v)} />
+                <input
+                  type="radio"
+                  name="trueFalseAnswer"
+                  value={v}
+                  className="sr-only"
+                  checked={trueFalseAnswer === v}
+                  onChange={() => setTrueFalseAnswer(v)}
+                />
                 {v === 'true' ? 'True' : 'False'}
               </label>
             ))}

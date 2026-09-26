@@ -1,13 +1,13 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { isAxiosError } from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useMemo, useState } from 'react';
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuth } from '@/lib/auth-context';
+import { errorMessage } from '@/lib/errors';
 import {
   useChangePassword,
   useMyPreferences,
@@ -59,12 +59,6 @@ const glyphs = {
     </svg>
   ),
 };
-
-function errorMessage(err: unknown, fallback: string) {
-  if (!isAxiosError<{ message?: string | string[] }>(err)) return fallback;
-  const message = err.response?.data?.message;
-  return (Array.isArray(message) ? message.join('. ') : message) ?? fallback;
-}
 
 // ---------------------------------------------------------------------------
 // Form pieces

@@ -109,6 +109,8 @@ export class AuthService {
       id: user.id,
       organizationId: user.organizationId,
       email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       branchIds: user.branches.map((b) => b.branchId),
       roles: user.roles.map((r) => r.role.key),
       permissions: buildEffectivePermissions(user.roles),

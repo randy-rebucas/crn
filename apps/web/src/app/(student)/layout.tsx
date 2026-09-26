@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { landingRouteForUser, useAuth } from '@/lib/auth-context';
 import { useMyNotifications, useMyStudentProfile } from '@/lib/student-hooks';
 import { BottomTabBar, MobileNavDrawer, StudentSidebar, StudentTopBar, icons } from '@/components/student-ui';
 
@@ -61,11 +61,20 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   const unreadCount = notifications.data?.filter((n) => !n.readAt).length ?? 0;
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Staff typing /student belong in their own portal: this shell reads
+  // "my profile / my enrollments", which only exists for a student account.
+  const home = user ? landingRouteForUser(user) : null;
+  const redirectTo = !user ? null : home !== '/student' ? home : null;
+
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace('/login');
     }
   }, [isLoading, user, router]);
+
+  useEffect(() => {
+    if (!isLoading && redirectTo) router.replace(redirectTo);
+  }, [isLoading, redirectTo, router]);
 
   const main = useMemo(
     () => NAV_MAIN.map((item) => (item.href === '/student/notifications' ? { ...item, badge: unreadCount } : item)),
@@ -73,7 +82,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   );
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  if (isLoading || !user) {
+  if (isLoading || !user || redirectTo) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading…</div>;
   }
 

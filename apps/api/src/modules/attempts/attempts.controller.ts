@@ -14,9 +14,11 @@ import { GradeAnswerDto } from './dto/grade-answer.dto.js';
 export class AttemptsController {
   constructor(private readonly attempts: AttemptsService) {}
 
+  // Without `examId` this is the caller's whole grading queue (every exam,
+  // same scope) in one request, instead of one request per exam.
   @Get()
   @RequirePermissions('exams.grade')
-  findAllForExam(@CurrentUser() user: AuthenticatedUser, @Query('examId') examId: string) {
+  findAllForExam(@CurrentUser() user: AuthenticatedUser, @Query('examId') examId?: string) {
     return this.attempts.findAllForExam(user, examId);
   }
 

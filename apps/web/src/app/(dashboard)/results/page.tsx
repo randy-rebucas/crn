@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '@/lib/api-client';
+import { humanize } from '@/lib/format';
 import { useAuth } from '@/lib/auth-context';
 import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge } from '@/components/ui';
 import { icons as baseIcons } from '@/components/student-ui';
@@ -52,11 +53,6 @@ const TYPE_TONES: Record<Exam['type'], string> = {
 
 const COLORS = { pass: '#059669', fail: '#b91c1c', grid: '#f1f5f9', axis: '#64748b', line: '#0f172a' };
 
-function humanize(value: string) {
-  const text = value.replace(/_/g, ' ').toLowerCase();
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
 function nameOf(a: Attempt) {
   return `${a.student.user.firstName} ${a.student.user.lastName}`.trim();
 }
@@ -97,8 +93,12 @@ function ResultPill({ passed }: { passed: boolean | null }) {
 
 function downloadCsv(exam: Exam, attempts: Attempt[]) {
   const escape = (v: string | number | null) => {
-    const s = v == null ? '' : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = v == null ? '' : String(v);
+    // Text cells starting with = + - @ (or a tab/CR) run as formulas when the
+    // file is opened in Excel or Sheets, and student names are user input —
+    // prefix them with ' so they're read as plain text.
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const rows = [
     ['Student', 'Status', 'Score', 'Max score', 'Percent', 'Result', 'Started', 'Submitted'],
@@ -119,7 +119,8 @@ function downloadCsv(exam: Exam, attempts: Attempt[]) {
   link.href = url;
   link.download = `${exam.title.replace(/[^\w-]+/g, '_')}_results.csv`;
   link.click();
-  URL.revokeObjectURL(url);
+  // Revoking synchronously can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 // ---------------------------------------------------------------------------

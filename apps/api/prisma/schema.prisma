@@ -471,6 +471,9 @@ model InstructorProfile {
   branchId       String?
   bio            String?
   specialization String?
+  /// Listed on the public website's instructor pages. Opt-in: a profile
+  /// stays off the public site until staff turn this on.
+  isPublic       Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

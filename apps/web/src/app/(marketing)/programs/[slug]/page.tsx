@@ -2,37 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
-import { API_BASE_URL } from '@/lib/api-client';
-
-interface PublicCourse {
-  id: string;
-  name: string;
-  code: string;
-  description: string | null;
-}
-
-interface PublicProgram {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  courses: PublicCourse[];
-}
-
-async function getProgram(slug: string): Promise<PublicProgram | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/public/programs/${slug}`, { next: { revalidate: 60 } });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+import { excerpt, getProgram } from '@/lib/public-api';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const program = await getProgram(slug);
-  return { title: program?.name ?? 'Program', description: program?.description ?? undefined };
+  if (!program) return { title: 'Program' };
+  return { title: program.name, description: program.description ? excerpt(program.description) : undefined };
 }
 
 export default async function ProgramDetailsPage({ params }: { params: Promise<{ slug: string }> }) {

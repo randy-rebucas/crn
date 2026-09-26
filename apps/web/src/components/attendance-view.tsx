@@ -1,7 +1,6 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { useMemo, useState } from 'react';
 import {
   Bar,
@@ -18,6 +17,7 @@ import {
 } from 'recharts';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { errorMessage } from '@/lib/errors';
 import { Card, EmptyState, ErrorState, Field, Input, LoadingState, PageHeader, Select } from '@/components/ui';
 
 interface ClassRecord {
@@ -497,8 +497,7 @@ export function AttendanceView({
       return queryClient.invalidateQueries({ queryKey: ['attendance', classId] });
     },
     onError: (err) => {
-      const message = isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined;
-      setMarkError(message ?? 'Could not mark attendance. Check your connection and try again.');
+      setMarkError(errorMessage(err, 'Could not mark attendance. Check your connection and try again.'));
     },
   });
 

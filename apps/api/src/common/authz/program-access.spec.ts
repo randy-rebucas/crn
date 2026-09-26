@@ -7,6 +7,8 @@ function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser
     id: 'user-1',
     organizationId: 'org-1',
     email: 'user@example.com',
+    firstName: 'Test',
+    lastName: 'User',
     branchIds: ['branch-a'],
     roles: ['some_role'],
     permissions: [],

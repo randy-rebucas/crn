@@ -80,14 +80,17 @@ export class AttemptsService {
     return attemptScopeWhere(user, 'exams.grade');
   }
 
-  async findAllForExam(user: AuthenticatedUser, examId: string) {
+  async findAllForExam(user: AuthenticatedUser, examId?: string) {
     return this.prisma.attempt.findMany({
       where: {
-        examId,
+        ...(examId ? { examId } : {}),
         exam: { organizationId: user.organizationId },
         ...(await this.resolveGradeScopeWhere(user)),
       },
-      include: { student: { select: { id: true, user: { select: SAFE_USER_SELECT } } } },
+      include: {
+        student: { select: { id: true, user: { select: SAFE_USER_SELECT } } },
+        exam: { select: { id: true, title: true } },
+      },
       orderBy: { startedAt: 'desc' },
     });
   }
@@ -209,16 +212,33 @@ export class AttemptsService {
       throw new BadRequestException('Exam is not published');
     }
 
-    const attemptCount = await this.prisma.attempt.count({
-      where: { examId, studentId: student.id },
-    });
-    if (attemptCount >= exam.attemptLimit) {
-      throw new BadRequestException(`Attempt limit (${exam.attemptLimit}) reached for this exam`);
+    // An open attempt is resumed, not joined by a second one: a double click,
+    // a second tab, or a client that hasn't loaded its history yet would
+    // otherwise spend another of the student's limited tries. An overdue one
+    // is closed first, the same as when it's read.
+    const openWhere = { examId, studentId: student.id, status: AttemptStatus.IN_PROGRESS };
+    const open = await this.prisma.attempt.findFirst({ where: openWhere, orderBy: { startedAt: 'desc' } });
+    if (open) {
+      if (!isOverdue(open, exam.timeLimitMinutes)) return open;
+      await this.closeExpired(organizationId, userId, open.id, examId);
     }
 
-    const attempt = await this.prisma.attempt.create({
-      data: { examId, studentId: student.id },
+    const { attempt, created } = await this.prisma.$transaction(async (tx) => {
+      // Locking the student's row serializes concurrent starts, so two
+      // requests can't both pass the open-attempt and limit checks below.
+      await tx.$queryRaw`SELECT id FROM student_profiles WHERE id = ${student.id} FOR UPDATE`;
+
+      const raced = await tx.attempt.findFirst({ where: openWhere, orderBy: { startedAt: 'desc' } });
+      if (raced) return { attempt: raced, created: false };
+
+      const attemptCount = await tx.attempt.count({ where: { examId, studentId: student.id } });
+      if (attemptCount >= exam.attemptLimit) {
+        throw new BadRequestException(`Attempt limit (${exam.attemptLimit}) reached for this exam`);
+      }
+
+      return { attempt: await tx.attempt.create({ data: { examId, studentId: student.id } }), created: true };
     });
+    if (!created) return attempt;
 
     await this.audit.log({
       organizationId,
