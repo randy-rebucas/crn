@@ -8,6 +8,8 @@ changing things.
 
 Monorepo with a Next.js web app and a NestJS API, managed as npm workspaces.
 
+Deploying (API on Render, web on Vercel): see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ## Structure
 
 - `apps/web` — Next.js 16 frontend (React 19, TypeScript, Tailwind CSS 4, TanStack Query, React
