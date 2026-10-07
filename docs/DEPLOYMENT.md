@@ -240,6 +240,26 @@ Fix: make sure no `pnpm-lock.yaml` / `pnpm-workspace.yaml` is committed, that
 `apps/web/vercel.json` is present, and that the dashboard has no Install/Build Command override.
 The build log should then show `npm ci` and `npm run build`.
 
+### Vercel: `Cannot find module '@tailwindcss/oxide-linux-x64-gnu'` (or `lightningcss-linux-x64-gnu`)
+
+Tailwind v4, Lightning CSS and Next's SWC compiler ship native binaries as per-platform optional
+packages. When `package-lock.json` is generated on Windows, npm records only the Windows packages
+([npm/cli#4828](https://github.com/npm/cli/issues/4828)), so `npm ci` on Vercel's Linux builder has
+nothing to install.
+
+`apps/web/package.json` pins the Linux packages under `optionalDependencies` so the lockfile always
+records them (Windows/macOS skip installing them):
+
+| Package | Must match |
+| --- | --- |
+| `@next/swc-linux-x64-gnu` | the `next` version |
+| `@tailwindcss/oxide-linux-x64-gnu` | the installed `@tailwindcss/oxide` version |
+| `lightningcss-linux-x64-gnu` | the `lightningcss` version under `apps/web/node_modules` |
+
+**When you upgrade `next` or `tailwindcss`, bump these to match,** then run `npm install` from the
+repo root. Check the lockfile still has them:
+`grep -E 'linux-x64-gnu"' package-lock.json`
+
 ## Routine deploys
 
 - Push to `main` → Render and Vercel both auto-deploy (Vercel also builds previews for other
