@@ -7,12 +7,14 @@ import type { UseFormRegisterReturn } from 'react-hook-form';
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-6 flex items-start justify-between gap-4">
-      <div>
+    // Wraps instead of squeezing: on a phone the action drops below the copy
+    // rather than narrowing the description to a few words per line.
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0 flex-1 basis-64">
         <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
         {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }

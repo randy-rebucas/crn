@@ -134,7 +134,7 @@ export function PaymentsTab({ createOpen, onCloseCreate }: { createOpen: boolean
               {activeFilter === 'PENDING' && !search ? 'Nothing waiting for verification.' : 'No payments match.'}
             </NoMatches>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>

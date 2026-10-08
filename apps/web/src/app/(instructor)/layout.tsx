@@ -297,7 +297,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             </span>
           </Link>
 
-          <nav aria-label="Instructor" className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Instructor" className="hidden items-center gap-1 lg:flex">
             {nav}
           </nav>
 
@@ -310,7 +310,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
         <nav
           ref={mobileNavRef}
           aria-label="Instructor"
-          className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 [scrollbar-width:none] md:hidden"
+          className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 [scrollbar-width:none] lg:hidden"
         >
           {nav}
         </nav>

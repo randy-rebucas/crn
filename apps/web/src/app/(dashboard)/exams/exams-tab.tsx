@@ -532,7 +532,7 @@ export function ExamsTab({ createOpen, onCloseCreate }: { createOpen: boolean; o
           ) : visible.length === 0 ? (
             <p className="px-4 py-14 text-center text-sm text-slate-500">No exams match.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[820px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>

@@ -93,6 +93,28 @@ function requiredPermissionFor(pathname: string): string | undefined {
   return match?.permission;
 }
 
+function DashboardFooter({ className }: { className: string }) {
+  return (
+    <div
+      className={`flex flex-col items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 text-center text-xs text-slate-500 sm:flex-row sm:text-left md:px-6 ${className}`}
+    >
+      <p>&copy; {new Date().getFullYear()} OBIAS Nursing &amp; Allied Courses Review Center. All rights reserved.</p>
+      <p className="flex items-center gap-2 font-medium text-red-700">
+        Your Success Is Our Mission!
+        <svg viewBox="0 0 48 16" className="h-3.5 w-12" fill="none">
+          <path
+            d="M0 8h10l3-6 4 12 3-9 2 3h26"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </p>
+    </div>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, hasPermission } = useAuth();
   const router = useRouter();
@@ -151,22 +173,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           role={user.roles[0] ?? 'Staff'}
           onMenuClick={() => setDrawerOpen(true)}
         />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
-        <div className="flex shrink-0 flex-col items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 sm:flex-row md:px-6">
-          <p>&copy; {new Date().getFullYear()} OBIAS Nursing &amp; Allied Courses Review Center. All rights reserved.</p>
-          <p className="flex items-center gap-2 font-medium text-red-700">
-            Your Success Is Our Mission!
-            <svg viewBox="0 0 48 16" className="h-3.5 w-12" fill="none">
-              <path
-                d="M0 8h10l3-6 4 12 3-9 2 3h26"
-                stroke="currentColor"
-                strokeWidth={1.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </p>
-        </div>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          {children}
+          {/* On a phone a pinned footer would permanently eat the bottom of
+              the screen, so below md it scrolls in after the page content. */}
+          <DashboardFooter className="-mx-4 -mb-4 mt-8 md:hidden" />
+        </main>
+        <DashboardFooter className="hidden shrink-0 md:flex" />
       </div>
     </div>
   );

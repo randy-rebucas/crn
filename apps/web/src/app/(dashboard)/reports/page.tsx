@@ -233,7 +233,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={`flex flex-col p-5 ${className}`}>
+    <Card className={`flex min-w-0 flex-col p-5 ${className}`}>
       <header className="mb-5 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700 [&_svg]:h-4 [&_svg]:w-4">
@@ -563,7 +563,7 @@ function ExamTablePanel({ query }: { query: ReturnType<typeof useReport<ExamPerf
       {query.isError && <InlineError what="exam performance" />}
       {rows && rows.length === 0 && <InlineEmpty>No exams have been created yet.</InlineEmpty>}
       {rows && rows.length > 0 && (
-        <div className="-mx-5 overflow-x-auto">
+        <div className="-mx-5 relative overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">

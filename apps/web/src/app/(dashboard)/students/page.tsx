@@ -655,7 +655,7 @@ export default function StudentsPage() {
                   })}
                 </ul>
 
-                <div className="-mx-5 hidden overflow-x-auto md:block">
+                <div className="-mx-5 hidden relative overflow-x-auto md:block">
                   <table className="w-full text-left text-sm">
                     <thead className="border-y border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                       <tr>

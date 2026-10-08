@@ -522,8 +522,8 @@ export function AttendanceView({
         }
       />
 
-      <Card className="mb-6 p-5">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+      <Card className="mb-6 p-4 sm:p-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
           <Field label="Class">
             <Select value={classId} onChange={(e) => setClassFilter(e.target.value)} disabled={classesLoading || classes.length === 0}>
               {classes.map((cls) => (
@@ -558,7 +558,7 @@ export function AttendanceView({
                 type="button"
                 onClick={() => setDate(today)}
                 disabled={date === today}
-                className="shrink-0 rounded-md px-3 text-sm font-medium text-red-700 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-default disabled:text-slate-400 disabled:hover:bg-transparent"
+                className="shrink-0 rounded-md px-2.5 text-sm font-medium text-red-700 transition hover:bg-red-50 sm:px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-default disabled:text-slate-400 disabled:hover:bg-transparent"
               >
                 Today
               </button>
@@ -671,7 +671,7 @@ export function AttendanceView({
               })}
             </div>
 
-            <div className="-mx-5 overflow-x-auto">
+            <div className="-mx-5 relative overflow-x-auto">
               <table className="w-full table-fixed text-left text-sm sm:table-auto">
                 <thead className="border-y border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>

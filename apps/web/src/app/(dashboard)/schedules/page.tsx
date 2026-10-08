@@ -360,7 +360,7 @@ function WeekGrid({
   const showNow = nowMinutes >= firstHour * 60 && nowMinutes <= lastHour * 60;
 
   return (
-    <div className="-mx-5 overflow-x-auto px-5">
+    <div className="-mx-5 relative overflow-x-auto px-5">
       <div className="grid min-w-[760px] grid-cols-[3.25rem_repeat(7,minmax(0,1fr))]">
         <div />
         {WEEK_ORDER.map((day) => (

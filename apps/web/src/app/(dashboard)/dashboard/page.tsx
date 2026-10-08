@@ -264,7 +264,9 @@ function EnrollmentTrendChart({ data }: { data: { month: string; active: number;
 
 function EnrollmentByProgramChart({ data, total }: { data: { name: string; count: number; color: string }[]; total: number }) {
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row">
+    // Side by side only where the card is wide enough: full-width below lg,
+    // a one-third column from lg until 2xl gives it room again.
+    <div className="flex flex-col items-center gap-4 sm:flex-row lg:flex-col 2xl:flex-row">
       <div className="relative h-44 w-44 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -281,7 +283,7 @@ function EnrollmentByProgramChart({ data, total }: { data: { name: string; count
           <div className="text-[10px] uppercase tracking-wide text-slate-400">Enrollments</div>
         </div>
       </div>
-      <ul className="min-w-0 flex-1 space-y-2">
+      <ul className="w-full min-w-0 flex-1 space-y-2">
         {data.map((row) => (
           <li key={row.name} className="flex items-center justify-between gap-3 text-xs">
             <span className="flex min-w-0 items-center gap-2 text-slate-600">
@@ -520,7 +522,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-slate-500">No enrollments yet.</p>
               )}
               {recentEnrollments && recentEnrollments.length > 0 && (
-                <div className="overflow-x-auto">
+                <div className="relative overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
@@ -556,7 +558,7 @@ export default function DashboardPage() {
               {examPerfQuery.isError && <QueryError />}
               {topExams && topExams.length === 0 && <p className="text-sm text-slate-500">No graded attempts yet.</p>}
               {topExams && topExams.length > 0 && (
-                <div className="overflow-x-auto">
+                <div className="relative overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">

@@ -256,7 +256,7 @@ function Timetable({
             .filter(Boolean)
             .join('. ')}
         </figcaption>
-        <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:thin]" aria-hidden>
+        <div className="-mx-1 relative overflow-x-auto px-1 [scrollbar-width:thin]" aria-hidden>
           <div className="min-w-[640px] pb-2.5">
             <div className="grid" style={{ gridTemplateColumns: `3.25rem repeat(${days.length}, minmax(0, 1fr))` }}>
               <div />

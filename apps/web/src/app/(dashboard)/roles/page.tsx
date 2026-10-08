@@ -628,7 +628,7 @@ function RoleDetail({
 function RolesTable({ roles, onOpen }: { roles: Role[]; onOpen: (role: Role) => void }) {
   return (
     <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>

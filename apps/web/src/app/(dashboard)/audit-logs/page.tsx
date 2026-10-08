@@ -150,7 +150,7 @@ function StateDiff({ before, after }: { before: unknown; after: unknown }) {
     );
     if (keys.length === 0) return <p className="text-xs text-slate-500">No field values changed.</p>;
     return (
-      <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <div className="relative overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full min-w-[420px] text-left text-xs">
           <thead className="bg-slate-50 text-slate-500">
             <tr>
