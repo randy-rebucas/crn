@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api-client';
 import { landingRouteForUser, useAuth } from '@/lib/auth-context';
 import { AdminSidebar, AdminTopBar, MobileNavDrawer } from '@/components/admin-shell';
 import { NAV_GROUPS, visibleNavGroups } from '@/components/admin-nav';
+import { QuickTour } from '@/components/quick-tour';
 
 interface Notification {
   id: string;
@@ -112,6 +113,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
         <DashboardFooter className="hidden shrink-0 md:flex" />
       </div>
+      <QuickTour portal="dashboard" autoStart={pathname === '/dashboard'} />
     </div>
   );
 }

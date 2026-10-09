@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { startQuickTour } from '@/components/quick-tour';
 
 // Mobile-first primitives for the student route group. Same red-700 /
 // slate token palette as the admin dashboard (components/ui.tsx), but a
@@ -24,6 +25,7 @@ export function BottomTabBar({ items }: { items: TabItem[] }) {
 
   return (
     <nav
+      data-tour="tabs"
       className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
       aria-label="Primary"
     >
@@ -218,6 +220,7 @@ function KeepGoingCard({ onNavigate }: { onNavigate?: () => void }) {
 export function StudentSidebar({ main, account }: { main: TabItem[]; account: TabItem[] }) {
   return (
     <aside
+      data-tour="nav"
       className="sticky top-0 hidden h-dvh w-[260px] shrink-0 flex-col border-r border-slate-200 bg-slate-50 lg:flex"
       aria-label="Student navigation"
     >
@@ -337,7 +340,7 @@ function PageSearch({ items }: { items: TabItem[] }) {
   };
 
   return (
-    <div ref={ref} className="relative w-full max-w-lg">
+    <div ref={ref} data-tour="search" className="relative w-full max-w-lg">
       <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">{icons.search}</span>
       <input
         type="search"
@@ -425,7 +428,7 @@ function AccountMenu({ firstName, lastName, email }: { firstName?: string; lastN
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} data-tour="account" className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -490,6 +493,17 @@ function AccountMenu({ firstName, lastName, email }: { firstName?: string; lastN
           </Link>
           <button
             role="menuitem"
+            onClick={() => {
+              close();
+              startQuickTour();
+            }}
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+          >
+            <span className="text-slate-400 [&_svg]:h-4 [&_svg]:w-4">{icons.sparkle}</span>
+            Quick tour
+          </button>
+          <button
+            role="menuitem"
             onClick={handleLogout}
             className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
           >
@@ -542,6 +556,7 @@ export function StudentTopBar({
         <div className="flex items-center gap-1 lg:gap-3">
           <Link
             href="/student/notifications"
+            data-tour="notifications"
             aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
             aria-current={onNotifications ? 'page' : undefined}
             className={`relative flex h-10 w-10 items-center justify-center rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${

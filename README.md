@@ -154,6 +154,12 @@ and `/student/guide`. Guide content lives in [`user-guides.ts`](apps/web/src/lib
 role key. Each task names the permission its page needs, so update it when a seeded role's permissions or a
 page's labels change.
 
+Each portal also has a quick tour ([`quick-tour.tsx`](apps/web/src/components/quick-tour.tsx)) that spotlights
+the shell: navigation, search, notifications, the guide card and the account menu. It opens once per account on
+the portal's home page, and can be reopened from the account menu or the guide. Steps point at `data-tour="..."`
+attributes, and a step whose element isn't visible at the current screen size is skipped, so keep those
+attributes when you restructure a shell.
+
 ## API modules
 
 `apps/api/src/modules/*`, one directory per bounded context, wired up in

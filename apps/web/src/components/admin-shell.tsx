@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { icons as baseIcons, Chevron } from '@/components/student-ui';
+import { startQuickTour } from '@/components/quick-tour';
 
 // Desktop/admin shell for the (dashboard) route group. Same red-700/slate
 // token palette and component conventions as components/ui.tsx and the
@@ -226,7 +227,7 @@ export function AdminSidebar({ groups }: { groups: AdminNavGroup[] }) {
   };
 
   return (
-    <aside className="hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+    <aside data-tour="nav" className="hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <Brand />
       <SidebarNav groups={groups} />
       <div className="px-3 pb-3">
@@ -314,7 +315,7 @@ function NavSearch({ items }: { items: AdminNavItem[] }) {
   };
 
   return (
-    <div ref={ref} className="relative w-full max-w-md">
+    <div ref={ref} data-tour="search" className="relative w-full max-w-md">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
         {icons.search}
       </span>
@@ -367,7 +368,7 @@ function AvatarMenu({ email, role }: { email: string; role: string }) {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} data-tour="account" className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -399,6 +400,17 @@ function AvatarMenu({ email, role }: { email: string; role: string }) {
             User guide
           </Link>
           <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              startQuickTour();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+          >
+            {icons.sparkle}
+            Quick tour
+          </button>
+          <button
             onClick={handleLogout}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
           >
@@ -429,6 +441,7 @@ export function AdminTopBar({
       <button
         onClick={onMenuClick}
         aria-label="Open menu"
+        data-tour="menu"
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 md:hidden"
       >
         {icons.menu}
@@ -444,6 +457,7 @@ export function AdminTopBar({
       <div className="flex items-center gap-2 md:gap-3">
         <Link
           href="/notifications"
+          data-tour="notifications"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           className="relative flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 active:bg-slate-100"
         >

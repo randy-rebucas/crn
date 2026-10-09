@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { type GuidePortal, type GuideTask, type RoleGuide, genericGuide, guidesForRoles } from '@/lib/user-guides';
 import { icons } from '@/components/student-ui';
+import { startQuickTour } from '@/components/quick-tour';
 
 // Role guides for all three portals. Content lives in lib/user-guides.ts;
 // this file only decides which guide(s) the signed-in user gets and renders
@@ -74,6 +75,21 @@ function useGuideCardHidden() {
 }
 
 // --- Pieces ------------------------------------------------------------------
+
+function TourButton({ className = '' }: { className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={startQuickTour}
+      className={`inline-flex items-center gap-1.5 rounded text-sm font-semibold text-slate-700 underline-offset-4 hover:text-red-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 ${className}`}
+    >
+      <span aria-hidden className="text-red-700 [&_svg]:h-4 [&_svg]:w-4">
+        {icons.sparkle}
+      </span>
+      Take the quick tour
+    </button>
+  );
+}
 
 function TaskCard({ task, index }: { task: GuideTask; index: number }) {
   return (
@@ -201,6 +217,12 @@ export function UserGuide({
           )}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-600 sm:p-5">
+            <h2 className="text-sm font-semibold text-slate-900">New here?</h2>
+            <p className="mt-1.5">The quick tour points out the menu, search, notifications and your account menu.</p>
+            <TourButton className="mt-2" />
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-600 sm:p-5">
             <h2 className="text-sm font-semibold text-slate-900">Need something else?</h2>
             <p className="mt-1.5">
               If a page you need is missing, your role doesn&apos;t include it. Ask your administrator to change your access.
@@ -249,6 +271,7 @@ export function GuideCard({
 
   return (
     <section
+      data-tour="guide-card"
       aria-labelledby="guide-card-heading"
       className={`@container relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:p-5 ${className}`}
     >
@@ -300,15 +323,18 @@ export function GuideCard({
         </ol>
       )}
 
-      <Link
-        href={guideHref}
-        className="mt-4 inline-flex items-center gap-1 self-start rounded text-sm font-semibold text-red-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-      >
-        Read the full guide
-        <span aria-hidden className="[&_svg]:h-4 [&_svg]:w-4">
-          {icons.arrowRight}
-        </span>
-      </Link>
+      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <Link
+          href={guideHref}
+          className="inline-flex items-center gap-1 rounded text-sm font-semibold text-red-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+        >
+          Read the full guide
+          <span aria-hidden className="[&_svg]:h-4 [&_svg]:w-4">
+            {icons.arrowRight}
+          </span>
+        </Link>
+        <TourButton />
+      </div>
     </section>
   );
 }

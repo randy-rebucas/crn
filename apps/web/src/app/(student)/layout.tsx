@@ -1,10 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { landingRouteForUser, useAuth } from '@/lib/auth-context';
 import { useMyNotifications, useMyStudentProfile } from '@/lib/student-hooks';
 import { BottomTabBar, MobileNavDrawer, StudentSidebar, StudentTopBar, icons } from '@/components/student-ui';
+import { QuickTour } from '@/components/quick-tour';
 
 const TAB_ITEMS = [
   { label: 'Home', href: '/student', icon: icons.home },
@@ -57,6 +58,7 @@ const SEARCH_ITEMS = [
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const notifications = useMyNotifications();
   const profile = useMyStudentProfile();
   const unreadCount = notifications.data?.filter((n) => !n.readAt).length ?? 0;
@@ -103,6 +105,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         {children}
         <BottomTabBar items={TAB_ITEMS} />
       </div>
+      <QuickTour portal="student" autoStart={pathname === '/student'} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { useInstructorName, useRoleLabel } from '@/lib/instructor-hooks';
 import { timeAgo } from '@/lib/instructor-schedule';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications } from '@/lib/student-hooks';
 import { adminIcons as icons } from '@/components/admin-shell';
+import { QuickTour, startQuickTour } from '@/components/quick-tour';
 
 // Distinct from (dashboard)'s sidebar and (student)'s bottom tab bar: a
 // horizontal top bar sized for a desk/tablet workflow between classes
@@ -79,7 +80,7 @@ function NotificationsMenu() {
   const unread = (notifications.data ?? []).filter((n) => !n.readAt).length;
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} data-tour="notifications" className="relative">
       <button
         ref={triggerRef}
         type="button"
@@ -181,7 +182,7 @@ function AccountMenu() {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} data-tour="account" className="relative">
       <button
         ref={triggerRef}
         type="button"
@@ -214,6 +215,17 @@ function AccountMenu() {
             <span className="text-slate-400">{icons.help}</span>
             User guide
           </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              startQuickTour();
+            }}
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+          >
+            <span className="text-slate-400">{icons.sparkle}</span>
+            Quick tour
+          </button>
           <button
             type="button"
             onClick={handleLogout}
@@ -306,7 +318,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             </span>
           </Link>
 
-          <nav aria-label="Instructor" className="hidden items-center gap-1 lg:flex">
+          <nav aria-label="Instructor" data-tour="nav" className="hidden items-center gap-1 lg:flex">
             {nav}
           </nav>
 
@@ -319,12 +331,14 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
         <nav
           ref={mobileNavRef}
           aria-label="Instructor"
+          data-tour="nav"
           className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 [scrollbar-width:none] lg:hidden"
         >
           {nav}
         </nav>
       </header>
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:py-8">{children}</main>
+      <QuickTour portal="instructor" autoStart={pathname === '/instructor'} />
     </div>
   );
 }
