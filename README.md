@@ -136,6 +136,12 @@ The seed is idempotent and additive: re-running it after adding a new permission
 that permission onto the `super_admin`, `student`, and `branch_manager` system roles, but it will
 **not** retroactively grant new permissions to custom roles created through the app.
 
+The seed also loads walkthrough data for the demo script in
+[`docs/DEMO_PLAN.md`](docs/DEMO_PLAN.md): `student@obias.local` is a graduate of the January 2026
+batch (graded exam history, paid invoice, certificate, notifications), and the batch's other
+students have open invoices, a pending payment to verify, and essays waiting in the grading queue.
+The seed prints the demo certificate's `/verify/<token>` URL at the end.
+
 These are local-development credentials only — change or remove them before deploying to a
 shared or production environment.
 

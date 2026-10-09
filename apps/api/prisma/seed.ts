@@ -1305,7 +1305,7 @@ async function main() {
 
   const QUESTIONS_SEED: {
     subjectName: string;
-    type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'IDENTIFICATION';
+    type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'IDENTIFICATION' | 'ESSAY';
     difficulty: 'EASY' | 'MODERATE' | 'DIFFICULT';
     topic: string;
     content: string;
@@ -1359,6 +1359,67 @@ async function main() {
       content: 'What is the minimum duration of depressive symptoms required for a diagnosis of Major Depressive Disorder per the DSM-5?',
       correctAnswer: '2 weeks',
     },
+    {
+      subjectName: 'Medical-Surgical Nursing',
+      type: 'MULTIPLE_CHOICE',
+      difficulty: 'MODERATE',
+      topic: 'Endocrine Disorders',
+      content: 'A client with type 1 diabetes is shaky, diaphoretic, and anxious before lunch. What should the nurse do first?',
+      options: [
+        { id: 'a', text: 'Check the capillary blood glucose' },
+        { id: 'b', text: 'Administer the scheduled insulin dose' },
+        { id: 'c', text: 'Notify the physician' },
+        { id: 'd', text: 'Encourage the client to rest' },
+      ],
+      correctAnswer: 'a',
+      explanation: 'These are signs of hypoglycemia; confirming the glucose level guides immediate treatment with fast-acting carbohydrates.',
+    },
+    {
+      subjectName: 'Medical-Surgical Nursing',
+      type: 'TRUE_FALSE',
+      difficulty: 'EASY',
+      topic: 'Fluids and Electrolytes',
+      content: 'Potassium chloride may be safely administered by IV push.',
+      correctAnswer: false,
+      explanation: 'IV push potassium can cause fatal cardiac arrhythmias; it must always be diluted and infused.',
+    },
+    {
+      subjectName: 'Maternal and Child Health Nursing',
+      type: 'MULTIPLE_CHOICE',
+      difficulty: 'EASY',
+      topic: 'Newborn Assessment',
+      content: 'The APGAR score is routinely assessed at which times after birth?',
+      options: [
+        { id: 'a', text: '1 and 5 minutes' },
+        { id: 'b', text: '5 and 10 minutes' },
+        { id: 'c', text: 'Immediately and at 1 hour' },
+        { id: 'd', text: '30 seconds and 2 minutes' },
+      ],
+      correctAnswer: 'a',
+    },
+    {
+      subjectName: 'Psychiatric Nursing',
+      type: 'MULTIPLE_CHOICE',
+      difficulty: 'MODERATE',
+      topic: 'Crisis Intervention',
+      content: 'A client states, "I have a plan to end my life tonight." What is the nurse\'s priority action?',
+      options: [
+        { id: 'a', text: 'Ensure the client\'s immediate safety with constant observation' },
+        { id: 'b', text: 'Schedule a follow-up session for tomorrow' },
+        { id: 'c', text: 'Explore the client\'s childhood experiences' },
+        { id: 'd', text: 'Reassure the client that things will get better' },
+      ],
+      correctAnswer: 'a',
+      explanation: 'A client with a specific plan is at high risk; safety takes priority over all other interventions.',
+    },
+    {
+      subjectName: 'Medical-Surgical Nursing',
+      type: 'ESSAY',
+      difficulty: 'DIFFICULT',
+      topic: 'Post-operative Care',
+      content: 'Describe the priority nursing assessments and interventions for a client during the first 24 hours after a thyroidectomy.',
+      correctAnswer: 'Airway patency and respiratory distress; hemorrhage at the incision (check behind the neck); signs of hypocalcemia (tingling, Chvostek/Trousseau); voice changes from laryngeal nerve injury; semi-Fowler\'s position with neck support; tracheostomy set at bedside.',
+    },
   ];
 
   let seededQuestions = 0;
@@ -1401,6 +1462,517 @@ async function main() {
     seededPricing += 1;
   }
 
+  // --- Demo walkthrough data (see docs/DEMO_PLAN.md) ---
+  // Without this, every exam, finance, grading, certificate and
+  // notification screen in the demo script opens empty. The student@ login
+  // is a graduate of the January batch: COMPLETED still grants program
+  // access (PROGRAM_ACCESS_ENROLLMENT_STATUSES) and is what certificate
+  // issuance requires. The batch's other students give finance and the
+  // instructor's grading queue something to act on live.
+  const orgSettings = await prisma.organizationSettings.findUnique({ where: { organizationId: org.id } });
+  const receiptPrefix = orgSettings?.receiptPrefix ?? 'RCPT';
+  const certificatePrefix = orgSettings?.certificatePrefix ?? 'CERT';
+  const cashierUserId = emailToUserId.get('cashier@obias.local') ?? superAdminUser.id;
+  const financeOfficerUserId = emailToUserId.get('finance_officer@obias.local') ?? superAdminUser.id;
+  const registrarUserId = emailToUserId.get('registrar@obias.local') ?? superAdminUser.id;
+
+  const demoStudentUserId = emailToUserId.get('student@obias.local');
+  const demoStudentProfile = demoStudentUserId
+    ? await prisma.studentProfile.findUnique({ where: { userId: demoStudentUserId } })
+    : null;
+
+  if (demoStudentProfile) {
+    const existing = await prisma.enrollment.findFirst({
+      where: { studentId: demoStudentProfile.id, batchId: mainBatch.id },
+    });
+    if (!existing) {
+      await prisma.enrollment.create({
+        data: {
+          studentId: demoStudentProfile.id,
+          programId: nursingProgram.id,
+          batchId: mainBatch.id,
+          branchId: mainBranch.id,
+          status: 'COMPLETED',
+        },
+      });
+      seededEnrollments += 1;
+    }
+  }
+
+  // North Branch students, so the branch manager's branch-scoped dashboard
+  // has something to show next to the org-wide owner view.
+  const NORTH_STUDENTS_SEED = [
+    { firstName: 'Angela', lastName: 'Cruz', email: 'angela.cruz@example.com' },
+    { firstName: 'Paolo', lastName: 'Villanueva', email: 'paolo.villanueva@example.com' },
+  ];
+  for (const seed of NORTH_STUDENTS_SEED) {
+    const user = await prisma.user.upsert({
+      where: { email: seed.email },
+      update: { passwordHash: studentPasswordHash },
+      create: {
+        organizationId: org.id,
+        email: seed.email,
+        passwordHash: studentPasswordHash,
+        firstName: seed.firstName,
+        lastName: seed.lastName,
+        branches: { create: [{ branchId: secondBranch.id }] },
+        roles: { create: [{ roleId: studentRole.id }] },
+      },
+    });
+    const profile = await prisma.studentProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, organizationId: org.id, branchId: secondBranch.id },
+    });
+    const existing = await prisma.enrollment.findFirst({ where: { studentId: profile.id, batchId: northBatch.id } });
+    if (existing) continue;
+    await prisma.enrollment.create({
+      data: {
+        studentId: profile.id,
+        programId: nursingProgram.id,
+        batchId: northBatch.id,
+        branchId: secondBranch.id,
+        status: 'ENROLLED',
+      },
+    });
+    seededEnrollments += 1;
+  }
+
+  // Attendance for the demo student (Section A, alongside the batch) and a
+  // history for Section B, the instructor@ login's own class, so neither
+  // attendance screen opens empty before the live roll call.
+  const instructorUserId = instructorDemo ? emailToUserId.get(instructorDemo.email) : undefined;
+  const sectionBClass = classByName.get('NCLEX Review - Section B');
+  const ATTENDANCE_EXTRA: { classRow: typeof sectionAClass; students: { id: string }[]; markedById?: string }[] = [
+    { classRow: sectionAClass, students: demoStudentProfile ? [demoStudentProfile] : [], markedById: attendanceMarker },
+    {
+      classRow: sectionBClass,
+      students: [...studentProfiles, ...(demoStudentProfile ? [demoStudentProfile] : [])],
+      markedById: instructorUserId,
+    },
+  ];
+  for (const { classRow, students, markedById } of ATTENDANCE_EXTRA) {
+    if (!classRow) continue;
+    for (const [dateIndex, date] of attendanceDates.entries()) {
+      for (const [studentIndex, student] of students.entries()) {
+        const where = { studentId_classId_date: { studentId: student.id, classId: classRow.id, date: new Date(date) } };
+        if (await prisma.attendance.findUnique({ where })) continue;
+        await prisma.attendance.create({
+          data: {
+            studentId: student.id,
+            classId: classRow.id,
+            date: new Date(date),
+            status: dateIndex === 1 && studentIndex === 1 ? 'LATE' : 'PRESENT',
+            markedById,
+          },
+        });
+        seededAttendance += 1;
+      }
+    }
+  }
+
+  const lizaProfile = studentProfiles.find((s) => s.email === 'liza.fernandez@example.com');
+  const miguelProfile = studentProfiles.find((s) => s.email === 'miguel.ramos@example.com');
+  const trishaProfile = studentProfiles.find((s) => s.email === 'trisha.navarro@example.com');
+
+  // Exams reference questions by their content, so they stay readable here
+  // and survive re-seeding (question ids are uuids).
+  const Q = {
+    heartFailure: QUESTIONS_SEED[0].content,
+    pursedLip: QUESTIONS_SEED[1].content,
+    prenatal: QUESTIONS_SEED[2].content,
+    mdd: QUESTIONS_SEED[3].content,
+    hypoglycemia: QUESTIONS_SEED[4].content,
+    potassium: QUESTIONS_SEED[5].content,
+    apgar: QUESTIONS_SEED[6].content,
+    suicide: QUESTIONS_SEED[7].content,
+    thyroidectomy: QUESTIONS_SEED[8].content,
+  };
+  const questionRows = await prisma.question.findMany({
+    where: { content: { in: Object.values(Q) }, subject: { course: { programId: nursingProgram.id } } },
+  });
+  const questionByContent = new Map(questionRows.map((q) => [q.content, q]));
+
+  const EXAMS_SEED: {
+    title: string;
+    type: 'PRACTICE' | 'DIAGNOSTIC' | 'MOCK' | 'FINAL';
+    timeLimitMinutes: number;
+    passingScore: number;
+    attemptLimit: number;
+    questions: { content: string; points: number }[];
+  }[] = [
+    {
+      title: 'NCLEX Diagnostic Exam',
+      type: 'DIAGNOSTIC',
+      timeLimitMinutes: 30,
+      passingScore: 4,
+      attemptLimit: 1,
+      questions: [Q.heartFailure, Q.pursedLip, Q.prenatal, Q.mdd, Q.apgar, Q.suicide].map((content) => ({ content, points: 1 })),
+    },
+    {
+      // Left with spare attempts so the student@ login can take it live.
+      title: 'Med-Surg Practice Quiz',
+      type: 'PRACTICE',
+      timeLimitMinutes: 10,
+      passingScore: 3,
+      attemptLimit: 10,
+      questions: [Q.heartFailure, Q.pursedLip, Q.hypoglycemia, Q.potassium].map((content) => ({ content, points: 1 })),
+    },
+    {
+      title: 'NCLEX Mock Exam 1',
+      type: 'MOCK',
+      timeLimitMinutes: 60,
+      passingScore: 7,
+      attemptLimit: 1,
+      questions: [
+        ...[Q.heartFailure, Q.hypoglycemia, Q.potassium, Q.apgar, Q.suicide].map((content) => ({ content, points: 1 })),
+        { content: Q.thyroidectomy, points: 5 },
+      ],
+    },
+  ];
+
+  let seededExams = 0;
+  const examByTitle = new Map<string, Awaited<ReturnType<typeof prisma.exam.create>>>();
+  for (const seed of EXAMS_SEED) {
+    let exam = await prisma.exam.findFirst({ where: { organizationId: org.id, title: seed.title } });
+    if (!exam) {
+      exam = await prisma.exam.create({
+        data: {
+          organizationId: org.id,
+          programId: nursingProgram.id,
+          title: seed.title,
+          type: seed.type,
+          timeLimitMinutes: seed.timeLimitMinutes,
+          passingScore: seed.passingScore,
+          attemptLimit: seed.attemptLimit,
+          status: 'PUBLISHED',
+          questions: {
+            create: seed.questions.flatMap(({ content, points }, position) => {
+              const question = questionByContent.get(content);
+              return question ? [{ questionId: question.id, points, position }] : [];
+            }),
+          },
+        },
+      });
+      seededExams += 1;
+    }
+    examByTitle.set(seed.title, exam);
+  }
+
+  // Items still waiting on staff (ungraded essays, the unverified payment)
+  // are dated relative to seeding time so the demo shows them as a couple
+  // of days old, not as months of neglect.
+  const daysAgo = (days: number, hour = 10) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    d.setHours(hour, 0, 0, 0);
+    return d.toISOString();
+  };
+
+  // Responses are what the student "picked"; correctness and scores are
+  // derived the same way AttemptsService.submit grades them, so the
+  // seeded history matches what the real exam engine would have produced.
+  // `essayPoints` set = already hand-graded; omitted = still in the
+  // instructor's grading queue (status SUBMITTED).
+  const ATTEMPTS_SEED: {
+    student: { id: string } | null | undefined;
+    examTitle: string;
+    startedAt: string;
+    minutes: number;
+    responses: Record<string, unknown>;
+    essayPoints?: number;
+    // Dated relative to seeding time, so it can't be matched by startedAt
+    // on a re-run; matched by exam + student instead.
+    relative?: boolean;
+  }[] = [
+    // student@ — a full graduate's history for /student/progress
+    {
+      student: demoStudentProfile,
+      examTitle: 'NCLEX Diagnostic Exam',
+      startedAt: '2026-01-09T09:00:00+08:00',
+      minutes: 24,
+      responses: { [Q.heartFailure]: 'b', [Q.pursedLip]: true, [Q.prenatal]: 'a', [Q.mdd]: '1 month', [Q.apgar]: 'a', [Q.suicide]: 'a' },
+    },
+    {
+      student: demoStudentProfile,
+      examTitle: 'Med-Surg Practice Quiz',
+      startedAt: '2026-02-03T19:30:00+08:00',
+      minutes: 8,
+      responses: { [Q.heartFailure]: 'b', [Q.pursedLip]: true, [Q.hypoglycemia]: 'c', [Q.potassium]: false },
+    },
+    {
+      student: demoStudentProfile,
+      examTitle: 'Med-Surg Practice Quiz',
+      startedAt: '2026-03-02T20:00:00+08:00',
+      minutes: 6,
+      responses: { [Q.heartFailure]: 'a', [Q.pursedLip]: true, [Q.hypoglycemia]: 'c', [Q.potassium]: false },
+    },
+    {
+      student: demoStudentProfile,
+      examTitle: 'NCLEX Mock Exam 1',
+      startedAt: '2026-04-11T09:00:00+08:00',
+      minutes: 52,
+      responses: {
+        [Q.heartFailure]: 'a',
+        [Q.hypoglycemia]: 'a',
+        [Q.potassium]: false,
+        [Q.apgar]: 'b',
+        [Q.suicide]: 'a',
+        [Q.thyroidectomy]:
+          'Monitor airway and breathing closely and keep a tracheostomy set at the bedside. Check the dressing and the back of the neck for bleeding. Watch for tingling or muscle spasms (hypocalcemia) and assess voice quality. Position in semi-Fowler\'s with the head and neck supported.',
+      },
+      essayPoints: 4,
+    },
+    // Rest of the January batch — results spread + live grading queue
+    {
+      student: lizaProfile,
+      examTitle: 'NCLEX Diagnostic Exam',
+      startedAt: '2026-01-09T09:00:00+08:00',
+      minutes: 27,
+      responses: { [Q.heartFailure]: 'a', [Q.pursedLip]: true, [Q.prenatal]: 'a', [Q.mdd]: '2 weeks', [Q.apgar]: 'b', [Q.suicide]: 'a' },
+    },
+    {
+      student: miguelProfile,
+      examTitle: 'NCLEX Diagnostic Exam',
+      startedAt: '2026-01-09T09:00:00+08:00',
+      minutes: 30,
+      responses: { [Q.heartFailure]: 'c', [Q.pursedLip]: false, [Q.prenatal]: 'a', [Q.mdd]: '6 months', [Q.apgar]: 'a', [Q.suicide]: 'd' },
+    },
+    {
+      student: trishaProfile,
+      examTitle: 'NCLEX Diagnostic Exam',
+      startedAt: '2026-01-09T09:00:00+08:00',
+      minutes: 22,
+      responses: { [Q.heartFailure]: 'a', [Q.pursedLip]: true, [Q.prenatal]: 'b', [Q.mdd]: '2 weeks', [Q.apgar]: 'a', [Q.suicide]: 'b' },
+    },
+    {
+      student: lizaProfile,
+      examTitle: 'NCLEX Mock Exam 1',
+      startedAt: daysAgo(2, 9),
+      relative: true,
+      minutes: 55,
+      responses: {
+        [Q.heartFailure]: 'a',
+        [Q.hypoglycemia]: 'a',
+        [Q.potassium]: false,
+        [Q.apgar]: 'a',
+        [Q.suicide]: 'a',
+        [Q.thyroidectomy]:
+          'Priority is the airway because swelling or bleeding can block it. I would check vital signs, look for bleeding at the incision, and ask the patient to speak to check the laryngeal nerve. Monitor calcium and watch for tetany.',
+      },
+    },
+    {
+      student: miguelProfile,
+      examTitle: 'NCLEX Mock Exam 1',
+      startedAt: daysAgo(1, 13),
+      relative: true,
+      minutes: 60,
+      responses: {
+        [Q.heartFailure]: 'b',
+        [Q.hypoglycemia]: 'a',
+        [Q.potassium]: true,
+        [Q.apgar]: 'a',
+        [Q.suicide]: 'a',
+        [Q.thyroidectomy]: 'Check vital signs and give pain medication. Keep the patient comfortable and monitor the wound.',
+      },
+    },
+  ];
+
+  let seededAttempts = 0;
+  for (const seed of ATTEMPTS_SEED) {
+    const exam = examByTitle.get(seed.examTitle);
+    if (!seed.student || !exam) continue;
+    const startedAt = new Date(seed.startedAt);
+    const existing = await prisma.attempt.findFirst({
+      where: { examId: exam.id, studentId: seed.student.id, ...(seed.relative ? {} : { startedAt }) },
+    });
+    if (existing) continue;
+
+    const examQuestions = await prisma.examQuestion.findMany({ where: { examId: exam.id }, include: { question: true } });
+    const answers = examQuestions.map(({ question, points }) => {
+      const response = seed.responses[question.content];
+      if (question.type === 'ESSAY') {
+        const graded = seed.essayPoints !== undefined;
+        return {
+          questionId: question.id,
+          response: response as never,
+          needsManualGrading: !graded,
+          isCorrect: graded ? seed.essayPoints! > 0 : null,
+          pointsAwarded: graded ? seed.essayPoints! : null,
+        };
+      }
+      const correct = question.correctAnswer;
+      const isCorrect =
+        typeof correct === 'string' && typeof response === 'string'
+          ? correct.trim().toLowerCase() === response.trim().toLowerCase()
+          : Boolean(correct) === Boolean(response);
+      return { questionId: question.id, response: response as never, needsManualGrading: false, isCorrect, pointsAwarded: isCorrect ? points : 0 };
+    });
+
+    const maxScore = examQuestions.reduce((sum, eq) => sum + eq.points, 0);
+    const submittedAt = new Date(startedAt.getTime() + seed.minutes * 60_000);
+    const pending = answers.some((a) => a.needsManualGrading);
+    const score = answers.reduce((sum, a) => sum + (a.pointsAwarded ?? 0), 0);
+    const hasEssay = examQuestions.some((eq) => eq.question.type === 'ESSAY');
+
+    await prisma.attempt.create({
+      data: {
+        examId: exam.id,
+        studentId: seed.student.id,
+        startedAt,
+        submittedAt,
+        maxScore,
+        ...(pending
+          ? { status: 'SUBMITTED' }
+          : {
+              status: 'GRADED',
+              score,
+              passed: score >= exam.passingScore,
+              // Hand-graded attempts finish a couple of days after submission.
+              gradedAt: hasEssay ? new Date(submittedAt.getTime() + 2 * 86_400_000) : submittedAt,
+            }),
+        answers: { create: answers },
+      },
+    });
+    seededAttempts += 1;
+  }
+
+  // Invoices for the January batch: one of each status so /finance has a
+  // paid, a partially paid (with a PENDING payment for Finance Officer to
+  // verify live — Cashier can record but not verify), and an overdue one.
+  const INVOICES_SEED: {
+    student: { id: string } | null | undefined;
+    discountAmount: number;
+    status: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
+    dueDate: string;
+    payments: { amount: number; method: 'CASH' | 'BANK_TRANSFER' | 'GCASH'; date: string; verified: boolean }[];
+  }[] = [
+    {
+      student: demoStudentProfile,
+      discountAmount: 1500_00,
+      status: 'PAID',
+      dueDate: '2026-01-05',
+      payments: [
+        { amount: 6750_00, method: 'GCASH', date: '2025-12-18', verified: true },
+        { amount: 6750_00, method: 'BANK_TRANSFER', date: '2026-02-14', verified: true },
+      ],
+    },
+    {
+      student: lizaProfile,
+      discountAmount: 0,
+      status: 'PAID',
+      dueDate: '2026-01-05',
+      payments: [{ amount: 15000_00, method: 'CASH', date: '2025-12-29', verified: true }],
+    },
+    {
+      student: miguelProfile,
+      discountAmount: 0,
+      status: 'PARTIALLY_PAID',
+      dueDate: '2026-01-05',
+      payments: [
+        { amount: 7500_00, method: 'GCASH', date: '2026-01-03', verified: true },
+        { amount: 7500_00, method: 'BANK_TRANSFER', date: daysAgo(2), verified: false },
+      ],
+    },
+    { student: trishaProfile, discountAmount: 0, status: 'UNPAID', dueDate: '2026-01-05', payments: [] },
+  ];
+
+  let seededInvoices = 0;
+  for (const seed of INVOICES_SEED) {
+    if (!seed.student) continue;
+    const enrollment = await prisma.enrollment.findFirst({ where: { studentId: seed.student.id, batchId: mainBatch.id } });
+    if (!enrollment) continue;
+    const existing = await prisma.invoice.findFirst({ where: { enrollmentId: enrollment.id } });
+    if (existing) continue;
+
+    const amount = 15000_00;
+    const invoice = await prisma.invoice.create({
+      data: {
+        enrollmentId: enrollment.id,
+        organizationId: org.id,
+        branchId: mainBranch.id,
+        amount,
+        discountAmount: seed.discountAmount,
+        totalAmount: amount - seed.discountAmount,
+        status: seed.status,
+        dueDate: new Date(seed.dueDate),
+        createdAt: new Date('2025-12-15'),
+      },
+    });
+    for (const p of seed.payments) {
+      const createdAt = new Date(p.date);
+      const payment = await prisma.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          amount: p.amount,
+          method: p.method,
+          status: p.verified ? 'VERIFIED' : 'PENDING',
+          receivedById: cashierUserId,
+          verifiedById: p.verified ? financeOfficerUserId : null,
+          verifiedAt: p.verified ? createdAt : null,
+          createdAt,
+        },
+      });
+      if (p.verified) {
+        await prisma.receipt.create({
+          data: { paymentId: payment.id, receiptNumber: `${receiptPrefix}-${payment.id.slice(0, 8).toUpperCase()}`, issuedAt: createdAt },
+        });
+      }
+    }
+    seededInvoices += 1;
+  }
+
+  // The graduate's certificate, so /student/certificates and the public
+  // /verify/[token] page have a real one to show.
+  let demoCertificate = demoStudentProfile
+    ? await prisma.certificate.findFirst({ where: { studentId: demoStudentProfile.id, programId: nursingProgram.id } })
+    : null;
+  if (demoStudentProfile && !demoCertificate) {
+    demoCertificate = await prisma.certificate.create({
+      data: {
+        organizationId: org.id,
+        studentId: demoStudentProfile.id,
+        programId: nursingProgram.id,
+        certificateNumber: `${certificatePrefix}-2026-${randomBytes(4).toString('hex').toUpperCase()}`,
+        qrToken: randomBytes(16).toString('hex'),
+        issuedById: registrarUserId,
+        issuedAt: new Date('2026-05-08'),
+      },
+    });
+  }
+
+  // A few notifications so the student's bell isn't empty; the newest two
+  // stay unread.
+  const NOTIFICATIONS_SEED: { type: string; title: string; body: string; createdAt: string; read: boolean }[] = demoCertificate
+    ? [
+        { type: 'payment.verified', title: 'Payment verified', body: 'Your payment of 6750.00 has been verified.', createdAt: '2026-02-14', read: true },
+        { type: 'attempt.graded', title: 'Exam graded', body: 'Your NCLEX Mock Exam 1 result is now available.', createdAt: '2026-04-13', read: true },
+        { type: 'certificate.issued', title: 'Certificate issued', body: `Your certificate ${demoCertificate.certificateNumber} is ready.`, createdAt: '2026-05-08', read: false },
+        { type: 'announcement', title: 'New mock exam schedule', body: 'The October NCLEX mock exam is open for alumni. See the schedule page for dates.', createdAt: '2026-10-01', read: false },
+      ]
+    : [];
+
+  let seededNotifications = 0;
+  if (demoStudentUserId) {
+    for (const seed of NOTIFICATIONS_SEED) {
+      const existing = await prisma.notification.findFirst({ where: { userId: demoStudentUserId, type: seed.type, title: seed.title } });
+      if (existing) continue;
+      const createdAt = new Date(seed.createdAt);
+      await prisma.notification.create({
+        data: {
+          organizationId: org.id,
+          userId: demoStudentUserId,
+          type: seed.type,
+          title: seed.title,
+          body: seed.body,
+          createdAt,
+          readAt: seed.read ? createdAt : null,
+        },
+      });
+      seededNotifications += 1;
+    }
+  }
+
   console.log('Seeded organization:', org.slug);
   console.log('Seeded roles:', 3 + ROLE_CATALOG.length);
   console.log('Seeded super admin:', superAdminUser.email, `(password: ${adminPassword})`);
@@ -1431,6 +2003,12 @@ async function main() {
   );
   console.log('Seeded question bank items:', seededQuestions);
   console.log('Seeded pricing entries:', seededPricing);
+  console.log(
+    `Seeded demo data: exams: ${seededExams}, attempts: ${seededAttempts}, invoices: ${seededInvoices}, notifications: ${seededNotifications}`,
+  );
+  if (demoCertificate) {
+    console.log(`Demo certificate ${demoCertificate.certificateNumber} — verify at /verify/${demoCertificate.qrToken}`);
+  }
   if (!process.env.SEED_ADMIN_PASSWORD) {
     console.log('⚠ This password was randomly generated and is only shown here — save it now.');
   }
