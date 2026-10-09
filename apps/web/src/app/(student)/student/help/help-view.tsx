@@ -47,6 +47,7 @@ const PORTAL_FAQS = [
 ];
 
 const TOPICS = [
+  { label: 'Student user guide', hint: 'Step by step through the portal', href: '/student/guide', icon: icons.layers, tone: 'bg-red-50 text-red-700' },
   { label: 'Classes and schedule', hint: 'Times, rooms, and attendance', href: '/student/schedule', icon: icons.schedule, tone: 'bg-blue-50 text-blue-700' },
   { label: 'Exams and results', hint: 'Open exams, scores, and retakes', href: '/student/progress', icon: icons.exams, tone: 'bg-red-50 text-red-700' },
   { label: 'Lessons and materials', hint: 'Courses, handouts, and videos', href: '/student/learn', icon: icons.learn, tone: 'bg-teal-50 text-teal-700' },

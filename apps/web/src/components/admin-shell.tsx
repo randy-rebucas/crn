@@ -390,6 +390,14 @@ function AvatarMenu({ email, role }: { email: string; role: string }) {
             <div className="truncate text-sm font-medium text-slate-900">{email}</div>
             <div className="text-[11px] text-slate-400">{role}</div>
           </div>
+          <Link
+            href="/guide"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+          >
+            {icons.help}
+            User guide
+          </Link>
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"

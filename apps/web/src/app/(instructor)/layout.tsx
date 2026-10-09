@@ -31,6 +31,7 @@ const NAV_ITEMS: { label: string; href: string; icon: React.ReactNode; permissio
     icon: icons.clipboardCheck,
     permissions: ['exams.grade', 'exams.view'],
   },
+  { label: 'Guide', href: '/instructor/guide', icon: icons.help },
 ];
 
 // Pages are gated the same way as (dashboard)/layout.tsx: longest-prefix
@@ -205,6 +206,14 @@ function AccountMenu() {
             <div className="truncate text-sm font-semibold text-slate-900">{name.full}</div>
             <div className="text-xs text-slate-500">{role}</div>
           </div>
+          <Link
+            href="/instructor/guide"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+          >
+            <span className="text-slate-400">{icons.help}</span>
+            User guide
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

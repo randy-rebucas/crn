@@ -23,6 +23,7 @@ import { apiClient } from '@/lib/api-client';
 import { Card, PageHeader, StatusBadge } from '@/components/ui';
 import { ProgressBar, icons as baseIcons } from '@/components/student-ui';
 import { adminIcons } from '@/components/admin-shell';
+import { GuideCard } from '@/components/user-guide';
 
 // Every widget here is backed by a real endpoint the signed-in user already
 // has (or lacks) permission for — no invented trend lines, per-course
@@ -588,6 +589,8 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-6">
+          <GuideCard portal="dashboard" guideHref="/guide" />
+
           {visibleShortcuts.length > 0 && (
             <SectionCard title="Quick Actions">
               <div className="grid grid-cols-2 gap-3">

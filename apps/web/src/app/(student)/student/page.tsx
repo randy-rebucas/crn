@@ -18,6 +18,7 @@ import {
   programGlyph,
 } from '@/components/student-ui';
 import { instructorIcons } from '@/components/instructor-ui';
+import { GuideCard } from '@/components/user-guide';
 import {
   type Enrollment,
   type Notification,
@@ -789,6 +790,7 @@ export default function StudentHomePage() {
             loading={notifications.isLoading}
             error={notifications.isError}
           />
+          <GuideCard portal="student" guideHref="/student/guide" className="md:col-span-2 xl:col-span-1" />
         </aside>
       </div>
 

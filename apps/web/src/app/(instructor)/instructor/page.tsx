@@ -29,6 +29,7 @@ import {
 } from '@/lib/instructor-hooks';
 import { useMyNotifications } from '@/lib/student-hooks';
 import { instructorIcons as icons } from '@/components/instructor-ui';
+import { GuideCard } from '@/components/user-guide';
 
 // The instructor's "Today" view. Every number is derived from endpoints the
 // instructor already has permission for (see lib/instructor-hooks.ts) — no
@@ -663,6 +664,8 @@ export default function InstructorHomePage() {
           </ModuleCard>
         )}
       </div>
+
+      <GuideCard portal="instructor" guideHref="/instructor/guide" className="mb-6" />
 
       <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-[1fr_1.15fr_1fr]">
         {canClasses && (

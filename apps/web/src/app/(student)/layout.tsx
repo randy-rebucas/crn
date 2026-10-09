@@ -36,6 +36,7 @@ const NAV_MAIN = [
 // password); /student/profile stays the read-only summary, reached from the
 // bottom tab bar and the account menu.
 const NAV_ACCOUNT = [
+  { label: 'User Guide', href: '/student/guide', icon: icons.layers, keywords: 'guide how to tutorial getting started' },
   { label: 'Help & Support', href: '/student/help', icon: icons.help, keywords: 'faq contact assistance' },
   { label: 'Settings', href: '/student/settings', icon: icons.settings, keywords: 'account password phone address emergency contact' },
 ];

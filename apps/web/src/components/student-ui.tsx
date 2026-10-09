@@ -471,6 +471,15 @@ function AccountMenu({ firstName, lastName, email }: { firstName?: string; lastN
             Settings
           </Link>
           <Link
+            href="/student/guide"
+            role="menuitem"
+            onClick={close}
+            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+          >
+            <span className="text-slate-400 [&_svg]:h-4 [&_svg]:w-4">{icons.layers}</span>
+            User guide
+          </Link>
+          <Link
             href="/student/help"
             role="menuitem"
             onClick={close}

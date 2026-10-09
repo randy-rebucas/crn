@@ -149,6 +149,11 @@ After login, each role lands in the route group that fits it: Student → `/stud
 Instructor → `/instructor`, everyone else → `/dashboard` (see `landingRouteForUser` in
 [`auth-context.tsx`](apps/web/src/lib/auth-context.tsx)).
 
+Each portal has a role user guide, with a summary card on its home page: `/guide`, `/instructor/guide`
+and `/student/guide`. Guide content lives in [`user-guides.ts`](apps/web/src/lib/user-guides.ts), keyed by
+role key. Each task names the permission its page needs, so update it when a seeded role's permissions or a
+page's labels change.
+
 ## API modules
 
 `apps/api/src/modules/*`, one directory per bounded context, wired up in
